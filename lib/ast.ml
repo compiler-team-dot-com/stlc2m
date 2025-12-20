@@ -32,6 +32,7 @@ let string_of_range (r : range) : string =
     (string_of_position r.start_pos)
     (string_of_position r.end_pos)
 
+(* prints arrows right-associatevely and parenthesizes left arrows *)
 let rec string_of_ty = function
   | TInt -> "Int"
   | TBool -> "Bool"
