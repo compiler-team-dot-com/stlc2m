@@ -38,6 +38,10 @@ expr:
       { mk_range_node $startpos $endpos (EIf (e1, e2, e3)) }
   | FUN; LPAREN; id = IDENT; COLON; ty = ty; RPAREN; ARROW; e = expr
       { mk_range_node $startpos $endpos (ELam (id, ty, e)) }
+/* EXPORT expr_app (not EXPORT expr) is deliberate: it avoids parsing "export let ..."
+*  without parentheses. To have "export (let ...)", one can always write parentheses.
+*  Keeps the grammar unambiguous early.
+*/
   | EXPORT; e = expr_app
       { mk_range_node $startpos $endpos (EExport e) }
   | e = expr_app
@@ -76,6 +80,7 @@ ty_arrow:
       { ty }
 
 ty_atom:
+/* IDENT for both term identifiers and type names for simplicity. */
   | id = IDENT
       {
         match id with
