@@ -7,3 +7,72 @@
 - Batch mode
 - ~--server~ mode
 - Emacs integration
+
+* Key Design Decisions
+** Annotated lambdas
+- Decision: require parameter annotations: ~fun (x : T) -> e~.
+- Rationale: avoid HM/unification so we can focus on stack-escape discipline and the editor dialog loop.
+
+** Escape discipline
+- Stack-only bindings introduced only by ~letstack~.
+- ~export e~ requires ~e~ to be stack-closed (no dependency on stack vars).
+- Implementation: type inference returns ~(ty, deps)~ where ~deps~ is a set of stack variables referenced.
+- Diagnostics: ~E_STACK_ESCAPE~ at export site; related locations point to stack binders.
+
+** Minimal surface language
+- Expressions: variables, int, bool, if, fun, app, let, letstack, export, parens.
+- Types: Int, Bool, right-associative arrow.
+
+* TODO Batch checker
+** TODO Define AST with ranges
+- ~range = {start_pos; end_pos}~
+- ~expr = {node; range}~
+- ~ty = TInt | TBool | TArrow of ty * ty~
+
+** TODO Implement lexer (ocamllex)
+- Tokens: LET, LETSTACK, IN, FUN, IF, THEN, ELSE, EXPORT, TRUE, FALSE
+- Punctuation: LPAREN, RPAREN, COLON, ARROW, EQ
+- Literals: INT of int, IDENT of string
+- EOF
+
+** TODO Implement parser (Menhir)
+- Grammar for expressions with precedence:
+  - let/letstack lowest
+  - if next
+  - fun next
+  - application left-assoc, higher precedence than atoms
+  - atoms: literals, identifiers, parenthesized
+- Grammar for types:
+  - Int | Bool | (T) | T -> T (right-assoc)
+  
+** TODO Implement checker (STLC + stack deps)
+- Environments:
+  - heap env: ident -> ty
+  - stack env: ident -> {ty; binder_range}
+- infer: env -> expr -> (ty * StringSet.t, diagnostic) result
+- export rule: if deps non-empty => E_STACK_ESCAPE with related binder ranges
+- other diagnostics: E_UNBOUND_VAR, E_TYPE_MISMATCH, E_EXPECTED_BOOL, etc.
+
+** TODO Implement batch CLI
+- Parse file; run checker; print diagnostics with ~file:line:col~.
+- Exit code 0 if no errors, 1 otherwise.
+
+** TODO Add initial tests
+- Escape direct: ~letstack x = 1 in export x~ (fail).
+- Escape via closure: ~letstack x = 1 in export (fun (y:Int) -> x)~ (fail).
+- Closed export: ~letstack x = 1 in export 2~ (pass).
+
+* TODO ~--server~ + Emacs spike
+** TODO Add ~--server~ mode(stdin/stdout JSON lines)
+- Request: ~{"id": 1, "method": "check", "uri": "...", "text": "..."}~.
+- Response: ~{"id": 1", "diagnostics": [...]}~.
+- Keep diagnostic schema stable.
+
+** TODO Emacs Lisp spike
+- Start server process per project.
+- On save or idle timer: send check request with buffer text.
+- Display diagnostics via Flymake or overlays.
+
+* Notes / Open Questions
+- Do we require the program to end with ~export~?
+- Should ~letstack~ also impose that the bound value itself is stack-closed?
