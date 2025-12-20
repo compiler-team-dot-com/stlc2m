@@ -1,0 +1,15 @@
+(ocamllex
+  (modules lexer))
+
+(menhir
+ (modules parser)
+ (flags --table --strict))
+
+(library
+ (name stlc2m)
+ (inline_tests)
+ (modules parser lexer)
+ (libraries core_unix menhirLib)
+ (preprocess
+  (pps ppx_inline_test)))
+

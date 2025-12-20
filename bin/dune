@@ -1,0 +1,4 @@
+(executable
+ (public_name stlc2m)
+ (name main)
+ (libraries stlc2m))
