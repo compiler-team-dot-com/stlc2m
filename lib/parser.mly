@@ -21,8 +21,10 @@ open Ast
 %%
 
 prog:
-  | EOF { None }
-  | e = expr; EOF { Some e }
+  | EOF
+      { None }
+  | e = expr; EOF
+      { Some e }
 
 /* --------------- Expressions (precedence) --------------- */
 
@@ -63,3 +65,23 @@ atom:
 
 /* -------------- Types ---------------- */
 
+ty:
+  | ty = ty_arrow
+      { ty }
+
+ty_arrow:
+  | t1 = ty_atom; ARROW; t2 = ty_arrow
+      { TArrow (t1, t2) } /* right-assoc */
+  | ty = ty_atom
+      { ty }
+
+ty_atom:
+  | id = IDENT
+      {
+        match id with
+	| "Int" -> TInt
+	| "Bool" -> TBool
+	| _ -> failwith ("Unknown type name: " ^ id)
+      }
+  | LPAREN; ty = ty; RPAREN
+      { ty }
