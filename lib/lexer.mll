@@ -24,5 +24,12 @@ let keyword_table : (string, Parser.token) Hashtbl.t =
   tbl
 }
 
+let whitespace = [' ' '\t' '\r' '\n']+
+let digit = ['0'-'9']
+let int_lit = digit+
+let ident_start = ['A'-'Z' 'a'-'z' '_']
+let ident_char = ['A'-'Z' 'a'-'z' '0'-'9' '_' '\'']
+let ident = ident_start ident_char+
+
 rule read = parse
   | eof { EOF }
