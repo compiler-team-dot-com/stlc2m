@@ -1,0 +1,9 @@
+ #+title: STLC Two Modes - Roadmap
+
+* Goals
+- Implement a /minimal/ STLC checker with an explicit stack-scope binder and explicit export boundary:
+  - ~letstack x = e1 in e2~
+  - ~export e~
+- Batch mode
+- ~--server~ mode
+- Emacs integration
