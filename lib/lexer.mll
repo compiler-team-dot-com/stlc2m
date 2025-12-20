@@ -31,5 +31,37 @@ let ident_start = ['A'-'Z' 'a'-'z' '_']
 let ident_char = ['A'-'Z' 'a'-'z' '0'-'9' '_' '\'']
 let ident = ident_start ident_char+
 
-rule read = parse
+rule token = parse
+  | whitespace { token lexbuf }
+
+  (* Comments: simple ML-style *)
+  | "(*" { comment lexbuf; token lexbuf }
+
+  | "->" { ARROW }
+  | "=" { EQ }
+  | ":" { COLON }
+  | "(" { LPAREN }
+  | ")" { RPAREN }
+
+  | int_lit as s {
+      (* Beware of overflow *)
+      INT (int_of_string s)
+    }
+
+  | ident as s {
+      match Hashtbl.find_opt keyword_table s with
+      | Some kw -> kw
+      | None -> IDENT s
+    }
+
   | eof { EOF }
+
+  | _ {
+      let ch = Lexing.lexeme lexbuf in
+      error lexbuf ("Unexpected character: " ^ ch)
+    }
+
+and comment = parse
+  | "*)" { () }
+  | eof { error lexbuf "Unterminated commend" }
+  | _ { comment lexbuf }
