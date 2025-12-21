@@ -136,7 +136,7 @@
                  (lambda (resp)
                    (when (buffer-live-p buffer)
                      (with-current-buffer buffer
-                       (stlc2m--apply-diagnostics resp))))
+                       (stlc2m--push-response-to-flycheck resp))))
                  stlc2m--pending)
         (process-send-string proc (concat json-str "\n"))))))
 
