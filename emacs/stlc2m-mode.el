@@ -15,7 +15,6 @@
 (defvar stlc2m--proc nil)
 (defvar stlc2m--next-id 1)
 (defvar stlc2m--pending (make-hash-table :test 'eql))
-(defvar-local stlc2m--overlays nil)
 
 (defun stlc2m--ensure-server ()
   "Ensure the stlc2m server process is running and return it."
@@ -140,11 +139,6 @@
                  stlc2m--pending)
         (process-send-string proc (concat json-str "\n"))))))
 
-(defun stlc2m--clear-overlays ()
-  (when stlc2m--overlays
-    (mapc #'delete-overlay stlc2m--overlays)
-    (setq stlc2m--overlays nil)))
-
 (defun stlc2m--pos-to-point (pos)
   "Convert server position POS (alist with 'line and 'col) to buffer point.
 Assumes line is 1-based; col is 0-based."
@@ -172,38 +166,6 @@ Assumes line is 1-based; col is 0-based."
         (goto-char start)
 	(message "%s" (alist-get 'message r0))))))
 
-(defun stlc2m--apply-diagnostics (resp)
-  "Render diagnostics from RESP into overlays in current buffer."
-  (stlc2m--clear-overlays)
-  (let* ((ok (alist-get 'ok resp))
-         (diags (alist-get 'diagnostics resp)))
-    (cond
-     ((not ok)
-      ;; Protocol error, show in minibuffer and keep buffer clean.
-      (let* ((err (alist-get 'error resp))
-             (code (alist-get 'code err))
-             (msg (alist-get 'message err)))
-        (message "stlc2m protocol error [%s]: %s" code msg)))
-     ((null diags) nil)
-     (t
-      (dolist (d diags)
-        (let* ((code (alist-get 'code d))
-               (msg (alist-get 'message d))
-               (sev (alist-get 'severity d))
-               (range (alist-get 'range d))
-               (start (stlc2m--pos-to-point (alist-get 'start range)))
-               (end (stlc2m--pos-to-point (alist-get 'end range)))
-               (ov (make-overlay start (max start end))))
-          (overlay-put ov 'stlc2m t)
-	  (overlay-put ov 'stlc2m-diag d)
-	  (overlay-put ov 'stlc2m-related (alist-get 'related d))
-          (overlay-put ov 'help-echo (format "[%s/%s] %s" code sev msg))
-          ;; underline + face to make it visible
-          (overlay-put ov 'face '(:underline (:style wave)))
-          (push ov stlc2m--overlays)))
-      ;; Optional: summary in minibuffer
-      (message "stlc2m: %d diagnostic(s)" (length diags))))))
-
 ;;;###autoload
 (define-minor-mode stlc2m-mode
   "Minor mode to check STLC2M buffers via stlc2m --server."
@@ -213,8 +175,7 @@ Assumes line is 1-based; col is 0-based."
         (add-hook 'after-save-hook #'stlc2m-check-buffer nil t)
         ;; Optional: check on enable
         (stlc2m-check-buffer))
-    (remove-hook 'after-save-hook #'stlc2m-check-buffer t)
-    (stlc2m--clear-overlays)))
+    (remove-hook 'after-save-hook #'stlc2m-check-buffer t)))
 
 (defun stlc2m-check-buffer ()
   "Check current buffer with stlc2m server."
