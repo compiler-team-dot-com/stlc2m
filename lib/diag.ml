@@ -1,3 +1,5 @@
+(* Diagnostic record + rendering *)
+
 open Ast
 
 type severity = Error | Warning | Info
