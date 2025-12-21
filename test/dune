@@ -1,2 +1,46 @@
-(test
- (name test_stlc2m))
+(rule
+ (alias runtest)
+ (deps %{bin:stlc2m} ok_closed_export.lang)
+ (action (run %{bin:stlc2m} %{dep:ok_closed_export.lang})))
+
+(rule
+ (alias runtest)
+ (deps %{bin:stlc2m} err_escape_direct.lang)
+ (action
+  (run bash -c
+       "set -e; \
+        echo '[TEST] err_escape_direct'; \
+        out=\"$(%{bin:stlc2m} %{dep:err_escape_direct.lang} 2>&1)\" && { \
+          echo 'Expected failure but command succeeded' >&2; exit 1; }; \
+        echo \"$out\" | grep -q 'E_STACK_ESCAPE' || { \
+          echo 'Expected E_STACK_ESCAPE but did not find it' >&2; \
+          echo \"$out\" >&2; exit 1; }; \
+        exit 0")))
+
+(rule
+ (alias runtest)
+ (deps %{bin:stlc2m} err_escape_closure.lang)
+ (action
+  (run bash -c
+       "set -e; \
+        echo '[TEST] err_escape_closure'; \
+        out=\"$(%{bin:stlc2m} %{dep:err_escape_closure.lang} 2>&1)\" && { \
+          echo 'Expected failure but command succeeded' >&2; exit 1; }; \
+        echo \"$out\" | grep -q 'E_STACK_ESCAPE' || { \
+          echo 'Expected E_STACK_ESCAPE but did not find it' >&2; \
+          echo \"$out\" >&2; exit 1; }; \
+        exit 0")))
+
+(rule
+ (alias runtest)
+ (deps %{bin:stlc2m} err_if_cond_not_bool.lang)
+ (action
+  (run bash -c
+       "set -e; \
+        echo '[TEST] err_if_cond_not_bool'; \
+        out=\"$(%{bin:stlc2m} %{dep:err_if_cond_not_bool.lang} 2>&1)\" && { \
+          echo 'Expected failure but command succeeded' >&2; exit 1; }; \
+        echo \"$out\" | grep -q 'E_EXPECTED_BOOL' || { \
+          echo 'Expected E_EXPECTED_BOOL but did not find it' >&2; \
+          echo \"$out\" >&2; exit 1; }; \
+        exit 0")))
