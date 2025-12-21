@@ -54,7 +54,7 @@ let rec infer (env : env) (e : expr) : (infer_result, Diag.t) result =
                ("If branches have different types: " ^ Ast.string_of_ty tt
               ^ " vs " ^ Ast.string_of_ty ft))
         else Ok (tt, union_deps cdeps (union_deps tdeps fdeps))
-  | ELam (x, xty, body) ->
+  | ELam (x, _xr, xty, body) ->
       let env' = extend_heap env x xty in
       let* bty, bdeps = infer env' body in
       Ok (TArrow (xty, bty), bdeps)
@@ -73,16 +73,14 @@ let rec infer (env : env) (e : expr) : (infer_result, Diag.t) result =
           Error
             (Diag.error ~code:"E_EXPECTED_FUN" ~range:f.range
                "Expected a function in application"))
-  | ELet (x, e1, e2) ->
+  | ELet (x, _xr, e1, e2) ->
       let* t1, d1 = infer env e1 in
       let env' = extend_heap env x t1 in
       let* t2, d2 = infer env' e2 in
       Ok (t2, union_deps d1 d2)
-  | ELetStack (x, e1, e2) ->
+  | ELetStack (x, xr, e1, e2) ->
       let* t1, d1 = infer env e1 in
-      let env' =
-        extend_stack env x { ty = t1; binder_range = range_of_ident e.range x }
-      in
+      let env' = extend_stack env x { ty = t1; binder_range = xr } in
       let* t2, d2 = infer env' e2 in
       Ok (t2, union_deps d1 d2)
   | EExport e1 ->
@@ -108,4 +106,3 @@ let rec infer (env : env) (e : expr) : (infer_result, Diag.t) result =
               variables are referenced")
 
 and ( let* ) r f = match r with Ok v -> f v | Error _ as e -> e
-and range_of_ident (r : range) (_x : string) : range = r

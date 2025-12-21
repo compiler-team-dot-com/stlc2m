@@ -8,10 +8,10 @@ and expr_node =
   | EInt of int
   | EBool of bool
   | EIf of expr * expr * expr
-  | ELam of string * ty * expr (* fun (x : ty) -> body *)
+  | ELam of string * range * ty * expr (* fun (x : ty) -> body *)
   | EApp of expr * expr
-  | ELet of string * expr * expr (* let x = e1 in e2 *)
-  | ELetStack of string * expr * expr (* letstack x = e1 in e2 *)
+  | ELet of string * range * expr * expr (* let x = e1 in e2 *)
+  | ELetStack of string * range * expr * expr (* letstack x = e1 in e2 *)
   | EExport of expr (* export e *)
 
 let mk_range (start_pos : Lexing.position) (end_pos : Lexing.position) : range =

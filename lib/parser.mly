@@ -30,14 +30,23 @@ prog:
 
 /* Lowest precedence: let/letstack (right-assoc in body) */
 expr:
-  | LET; id = IDENT; EQ; e = expr; IN; body = expr
-      { mk_range_node $startpos $endpos (ELet (id, e, body)) }
-  | LETSTACK; id = IDENT; EQ; e = expr; IN; body = expr
-      { mk_range_node $startpos $endpos (ELetStack (id, e, body)) }
+  | LET; x = IDENT; EQ; e = expr; IN; body = expr
+      {
+	let xr = mk_range $startpos(x) $endpos(x) in
+	mk_range_node $startpos $endpos (ELet (x, xr, e, body))
+      }
+  | LETSTACK; x = IDENT; EQ; e = expr; IN; body = expr
+      {
+	let xr = mk_range $startpos(x) $endpos(x) in
+        mk_range_node $startpos $endpos (ELetStack (x, xr, e, body))
+      }
   | IF; e1 = expr; THEN; e2 = expr; ELSE; e3 = expr
       { mk_range_node $startpos $endpos (EIf (e1, e2, e3)) }
-  | FUN; LPAREN; id = IDENT; COLON; ty = ty; RPAREN; ARROW; e = expr
-      { mk_range_node $startpos $endpos (ELam (id, ty, e)) }
+  | FUN; LPAREN; x = IDENT; COLON; ty = ty; RPAREN; ARROW; e = expr
+      {
+	let xr = mk_range $startpos(x) $endpos(x) in
+        mk_range_node $startpos $endpos (ELam (x, xr, ty, e))
+      }
 /* EXPORT expr_app (not EXPORT expr) is deliberate: it avoids parsing "export let ..."
 *  without parentheses. To have "export (let ...)", one can always write parentheses.
 *  Keeps the grammar unambiguous early.
@@ -56,8 +65,8 @@ expr_app:
 
 /* Atoms */
 atom:
-  | id = IDENT
-      { mk_range_node $startpos $endpos (EVar id) }
+  | x = IDENT
+      { mk_range_node $startpos $endpos (EVar x) }
   | i = INT
       { mk_range_node $startpos $endpos (EInt i) }
   | TRUE
@@ -81,12 +90,12 @@ ty_arrow:
 
 ty_atom:
 /* IDENT for both term identifiers and type names for simplicity. */
-  | id = IDENT
+  | t = IDENT
       {
-        match id with
+        match t with
 	| "Int" -> TInt
 	| "Bool" -> TBool
-	| _ -> failwith ("Unknown type name: " ^ id)
+	| _ -> failwith ("Unknown type name: " ^ t)
       }
   | LPAREN; ty = ty; RPAREN
       { ty }
