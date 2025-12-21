@@ -15,6 +15,7 @@
 (defvar stlc2m--proc nil)
 (defvar stlc2m--next-id 1)
 (defvar stlc2m--pending (make-hash-table :test 'eql))
+(defvar-local stlc2m--flycheck-last-id 0)
 
 (defun stlc2m--ensure-server ()
   "Ensure the stlc2m server process is running and return it."
@@ -139,6 +140,52 @@
                  stlc2m--pending)
         (process-send-string proc (concat json-str "\n"))))))
 
+(defun stlc2m--flycheck-start (_checker callback)
+  "Flycheck start function. Sends buffer to stlc2m server and calls CALLBACK."
+  (let* ((buf (current-buffer))
+         (proc (stlc2m--ensure-server)))
+    (with-current-buffer buf
+      (let* ((id stlc2m--next-id)
+             (uri (stlc2m--buffer-uri))
+             (text (buffer-substring-no-properties (point-min) (point-max)))
+             (req `((id . ,id)
+                    (method . "check")
+                    (uri . ,uri)
+                    (text . ,text)))
+             (json-str (if (fboundp 'json-serialize)
+                           (json-serialize req)
+                         (json-encode req))))
+        (setq stlc2m--next-id (1+ stlc2m--next-id))
+        (setq stlc2m--flycheck-last-id id)
+
+        (puthash id
+                 (lambda (resp)
+                   (when (buffer-live-p buf)
+                     (with-current-buffer buf
+                       ;; Ignore stale responses from older requests.
+                       (when (= id stlc2m--flycheck-last-id)
+                         (let ((ok (alist-get 'ok resp)))
+                           (cond
+                            ((not ok)
+                             (let* ((err (alist-get 'error resp))
+                                    (ecode (alist-get 'code err))
+                                    (emsg (alist-get 'message err))
+                                    (fe (flycheck-error-new-at
+                                         1 1 'error
+                                         (format "[%s] %s" ecode emsg)
+                                         :checker 'stlc2m
+                                         :data resp)))
+                               (funcall callback 'finished (list fe))))
+                            (t
+                             (let* ((diags (alist-get 'diagnostics resp))
+                                    (errs (mapcar #'stlc2m--diag->flycheck-error diags)))
+                               (funcall callback 'finished errs)))))))))
+                 stlc2m--pending)
+
+        (process-send-string proc (concat json-str "\n"))
+        ;; Flycheck expects a cleanup object; nil is fine here.
+        nil))))
+
 (defun stlc2m--pos-to-point (pos)
   "Convert server position POS (alist with 'line and 'col) to buffer point.
 Assumes line is 1-based; col is 0-based."
@@ -166,6 +213,16 @@ Assumes line is 1-based; col is 0-based."
         (goto-char start)
 	(message "%s" (alist-get 'message r0))))))
 
+(define-derived-mode stlc2m-source-mode prog-mode "STLC2M"
+  "Major mode for STLC2M files.")
+(add-to-list 'auto-mode-alist '("\\.lang\\'" . stlc2m-source-mode))
+
+(flycheck-define-generic-checker 'stlc2m
+  "A Flycheck checker using the stlc2m --server."
+  :start #'stlc2m--flycheck-start
+  :modes '(stlc2m-source-mode))
+(add-to-list 'flycheck-checkers 'stlc2m)
+
 ;;;###autoload
 (define-minor-mode stlc2m-mode
   "Minor mode to check STLC2M buffers via stlc2m --server and display diagnostics via Flycheck."
@@ -175,7 +232,6 @@ Assumes line is 1-based; col is 0-based."
 	(flycheck-mode 1)
 	;; Make stlc2m the active checker in this buffer:
 	(setq-local flycheck-checker 'stlc2m)
-        (add-hook 'after-save-hook #'stlc2m-check-buffer nil t)
         ;; Optional: check on enable
         (stlc2m-check-buffer))
     (progn
