@@ -15,7 +15,12 @@
 (defvar stlc2m--proc nil)
 (defvar stlc2m--next-id 1)
 (defvar stlc2m--pending (make-hash-table :test 'eql))
+
 (defvar-local stlc2m--flycheck-last-id 0)
+;; For "Problems" buffer
+(defvar stlc2m--problems-buffer-name "*stlc2m-problems*")
+(defvar-local stlc2m--last-response nil)
+(defvar-local stlc2m--last-uri nil)
 
 (defun stlc2m--ensure-server ()
   "Ensure the stlc2m server process is running and return it."
@@ -162,6 +167,10 @@
                  (lambda (resp)
                    (when (buffer-live-p buf)
                      (with-current-buffer buf
+		       ;; Store for "Problems" buffer
+		       (setq stlc2m--last-response resp)
+		       (setq stlc2m--last-uri (stlc2m--buffer-uri))
+
                        ;; Ignore stale responses from older requests.
                        (when (= id stlc2m--flycheck-last-id)
                          (let ((ok (alist-get 'ok resp)))
@@ -212,6 +221,60 @@ Assumes line is 1-based; col is 0-based."
              (start (stlc2m--pos-to-point (alist-get 'start rrange))))
         (goto-char start)
 	(message "%s" (alist-get 'message r0))))))
+
+(defun stlc2m--render-problems (srcbuf resp)
+  "Render RESP (alist) for SRCBUF into the problems buffer."
+  (let ((buf (get-buffer-create stlc2m--problems-buffer-name)))
+    (with-current-buffer buf
+      (setq buffer-read-only nil)
+      (erase-buffer)
+
+      (insert (format "STLC2m Problems\nSource: %s\nURI: %s\n\n"
+                      (buffer-name srcbuf)
+                      (or (buffer-local-value 'stlc2m--last-uri srcbuf) "<unknown>")))
+
+      (let ((ok (alist-get 'ok resp)))
+        (if (not ok)
+            (let* ((err (alist-get 'error resp))
+                   (code (alist-get 'code err))
+                   (msg (alist-get 'message err)))
+              (insert (format "Protocol/Server error: [%s] %s\n" code msg)))
+          (let ((diags (alist-get 'diagnostics resp)))
+            (if (null diags)
+                (insert "No diagnostics.\n")
+              (dolist (d diags)
+                (let* ((code (alist-get 'code d))
+                       (sev  (alist-get 'severity d))
+                       (msg  (alist-get 'message d))
+                       (range (alist-get 'range d))
+                       (start (alist-get 'start range))
+                       (line (alist-get 'line start))
+                       (col0 (alist-get 'col start))
+                       (related (alist-get 'related d)))
+                  (insert (format "[%s/%s] %s\n" code sev msg))
+                  (insert (format "  at %d:%d\n" line col0))
+                  (when (and (listp related) related)
+                    (dolist (r related)
+                      (let* ((rmsg (alist-get 'message r))
+                             (rrange (alist-get 'range r))
+                             (rstart (alist-get 'start rrange))
+                             (rline (alist-get 'line rstart))
+                             (rcol0 (alist-get 'col rstart)))
+                        (insert (format "    related: %s\n" rmsg))
+                        (insert (format "      -> %d:%d\n" rline rcol0)))))
+                  (insert "\n"))))))))
+
+      (goto-char (point-min))
+      (view-mode 1)
+      (display-buffer buf)))
+
+(defun stlc2m-problems ()
+  "Show the STLC2m Problems buffer for the current source buffer.
+Uses the last stored server response (no re-check)."
+  (interactive)
+  (unless stlc2m--last-response
+    (user-error "No diagnostics available yet.  Run Flycheck (e.g. save buffer) first"))
+  (stlc2m--render-problems (current-buffer) stlc2m--last-response))
 
 (define-derived-mode stlc2m-source-mode prog-mode "STLC2M"
   "Major mode for STLC2M files.")
