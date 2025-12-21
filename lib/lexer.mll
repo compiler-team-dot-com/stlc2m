@@ -24,7 +24,8 @@ let keyword_table : (string, Parser.token) Hashtbl.t =
   tbl
 }
 
-let whitespace = [' ' '\t' '\r' '\n']+
+let whitespace = [' ' '\t' '\r']+
+let newline = [' ' '\009' '\012']* '\n'
 let digit = ['0'-'9']
 let int_lit = digit+
 let ident_start = ['A'-'Z' 'a'-'z' '_']
@@ -33,6 +34,7 @@ let ident = ident_start ident_char*
 
 rule token = parse
   | whitespace { token lexbuf }
+  | newline { Lexing.new_line lexbuf; token lexbuf }
 
   (* Comments: simple ML-style *)
   | "(*" { comment lexbuf; token lexbuf }
@@ -63,5 +65,6 @@ rule token = parse
 
 and comment = parse
   | "*)" { () }
+  | '\n' { Lexing.new_line lexbuf; comment lexbuf }
   | eof { error lexbuf "Unterminated commend" }
   | _ { comment lexbuf }
