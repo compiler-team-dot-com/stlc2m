@@ -168,14 +168,19 @@ Assumes line is 1-based; col is 0-based."
 
 ;;;###autoload
 (define-minor-mode stlc2m-mode
-  "Minor mode to check STLC2M buffers via stlc2m --server."
+  "Minor mode to check STLC2M buffers via stlc2m --server and display diagnostics via Flycheck."
   :lighter " stlc2m"
   (if stlc2m-mode
       (progn
+	(flycheck-mode 1)
+	;; Make stlc2m the active checker in this buffer:
+	(setq-local flycheck-checker 'stlc2m)
         (add-hook 'after-save-hook #'stlc2m-check-buffer nil t)
         ;; Optional: check on enable
         (stlc2m-check-buffer))
-    (remove-hook 'after-save-hook #'stlc2m-check-buffer t)))
+    (progn
+      (kill-local-variable 'flycheck-checker)
+      (remove-hook 'after-save-hook #'stlc2m-check-buffer t))))
 
 (defun stlc2m-check-buffer ()
   "Check current buffer with stlc2m server."
