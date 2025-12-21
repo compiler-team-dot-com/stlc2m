@@ -1,5 +1,9 @@
 open Stlc2m
 
+let usage () =
+  Printf.eprintf "Usage: stlc2m [--server] [file]\n";
+  exit 2
+
 let parse_from_channel (ic : in_channel) : Ast.expr option =
   let lexbuf = Lexing.from_channel ic in
   try Parser.prog Lexer.token lexbuf with
@@ -14,18 +18,9 @@ let parse_from_channel (ic : in_channel) : Ast.expr option =
         (pos.Lexing.pos_cnum - pos.Lexing.pos_bol);
       exit 1
 
-let () =
-  let file =
-    match Array.to_list Sys.argv with
-    | [ _ ] -> None
-    | [ _; f ] -> Some f
-    | _ ->
-        Printf.eprintf "Usage: stlc2m [file]\n";
-        exit 2
-  in
-  let ic, _file_label =
-    match file with None -> (stdin, "<stdin>") | Some f -> (open_in f, f)
-  in
+type mode = Server | Stdin | File of string
+
+let run_ic ic =
   match parse_from_channel ic with
   | None -> exit 0
   | Some e -> (
@@ -34,3 +29,16 @@ let () =
       | Error d ->
           print_endline (Diag.to_human d);
           exit 1)
+
+let () =
+  let m =
+    match Array.to_list Sys.argv with
+    | [ _ ] -> Stdin
+    | [ _; "--server" ] -> Server
+    | [ _; f ] -> File f
+    | _ -> usage ()
+  in
+  match m with
+  | Server -> Server.run ()
+  | Stdin -> run_ic stdin
+  | File f -> run_ic (open_in f)
