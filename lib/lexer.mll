@@ -29,7 +29,7 @@ let digit = ['0'-'9']
 let int_lit = digit+
 let ident_start = ['A'-'Z' 'a'-'z' '_']
 let ident_char = ['A'-'Z' 'a'-'z' '0'-'9' '_' '\'']
-let ident = ident_start ident_char+
+let ident = ident_start ident_char*
 
 rule token = parse
   | whitespace { token lexbuf }
