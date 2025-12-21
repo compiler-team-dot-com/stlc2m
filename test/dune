@@ -44,3 +44,25 @@
           echo 'Expected E_EXPECTED_BOOL but did not find it' >&2; \
           echo \"$out\" >&2; exit 1; }; \
         exit 0")))
+
+(rule
+ (alias runtest)
+ (deps %{bin:stlc2m})
+ (action
+  (run bash -c
+       "echo '[TEST] server_smoke_stack_escape'; \
+        printf '%s\n' '{\"id\":1,\"method\":\"check\",\"uri\":\"file:///t\",\"text\":\"letstack x = 1 in export x\"}' \
+        | %{bin:stlc2m} --server \
+        | head -n 1 \
+        | grep -q 'E_STACK_ESCAPE'")))
+
+(rule
+ (alias runtest)
+ (deps %{bin:stlc2m})
+ (action
+  (run bash -c
+       "echo '[TEST] server_smoke_ok'; \
+        printf '%s\n' '{\"id\":1,\"method\":\"check\",\"uri\":\"file:///t\",\"text\":\"export 1\"}' \
+        | %{bin:stlc2m} --server \
+        | head -n 1 \
+        | grep -q '\"diagnostics\":\\[\\]'")))
