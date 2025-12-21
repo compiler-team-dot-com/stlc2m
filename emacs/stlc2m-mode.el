@@ -115,6 +115,22 @@ Assumes line is 1-based; col is 0-based."
       (forward-char (max 0 (or col 0)))
       (point))))
 
+(defun stlc2m-jump-to-related ()
+  "Jump to the first related location of the diagnostic overlay at point."
+  (interactive)
+  (let* ((ovs (overlays-at (point)))
+         (ov (cl-find-if (lambda (o) (overlay-get o 'stlc2m)) ovs)))
+    (unless ov
+      (user-error "No stlc2m diagnostic at point"))
+    (let* ((related (overlay-get ov 'stlc2m-related)))
+      (unless (and related (listp related))
+        (user-error "No related locations for this diagnostic"))
+      (let* ((r0 (car related))
+             (rrange (alist-get 'range r0))
+             (start (stlc2m--pos-to-point (alist-get 'start rrange))))
+        (goto-char start)
+	(message "%s" (alist-get 'message r0))))))
+
 (defun stlc2m--apply-diagnostics (resp)
   "Render diagnostics from RESP into overlays in current buffer."
   (stlc2m--clear-overlays)
@@ -138,6 +154,8 @@ Assumes line is 1-based; col is 0-based."
                (end (stlc2m--pos-to-point (alist-get 'end range)))
                (ov (make-overlay start (max start end))))
           (overlay-put ov 'stlc2m t)
+	  (overlay-put ov 'stlc2m-diag d)
+	  (overlay-put ov 'stlc2m-related (alist-get 'related d))
           (overlay-put ov 'help-echo (format "[%s/%s] %s" code sev msg))
           ;; underline + face to make it visible
           (overlay-put ov 'face '(:underline (:style wave)))
