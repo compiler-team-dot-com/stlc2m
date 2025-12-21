@@ -8,7 +8,7 @@
 (library
  (name stlc2m)
  (inline_tests)
- (modules ast diag checker parser lexer)
+ (modules server ast diag checker parser lexer)
  (libraries core_unix menhirLib yojson)
  (preprocess
   (pps ppx_inline_test)))
