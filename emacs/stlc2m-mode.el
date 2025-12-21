@@ -2,6 +2,7 @@
 
 (require 'json)
 (require 'cl-lib)
+(require 'flycheck)
 
 (defgroup stlc2m nil
   "Dialog client for the stlc2m compiler server."
@@ -68,6 +69,27 @@
           (funcall cb obj)))
     (error
      (message "stlc2m: failed to parse response: %S (line=%s)" err line))))
+
+(defun stlc2m--diag->flycheck-error (diag)
+  "Convert one server DIAG (alist) to a `flycheck-error`."
+  (let* ((code (alist-get 'code diag))
+	 (msg (alist-get 'message diag))
+	 (sev (alist-get 'severity diag))
+	 (range (alist-get 'range diag))
+	 (start (alist-get 'start range))
+	 ;; Server: line is 1-based, col is 0-based
+	 (line (alist-get 'line start))
+	 (col0 (alist-get 'col start))
+	 ;; Flycheck expects 1-based columns (or nil)
+	 (col (and (numberp col0) (1+ col0)))
+	 (level (pcase sev
+		  ("error" 'error)
+		  ("warning" 'warning)
+		  (_ 'info))))
+    (flycheck-error-new-at
+     line col level
+     (format "[%s] %s" code msg)
+     :checker 'stlc2m)))
 
 (defun stlc2m--buffer-uri ()
   "Return a file:// URI for current buffer, or a synthetic one."
