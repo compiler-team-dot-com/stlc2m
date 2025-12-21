@@ -15,7 +15,18 @@ let parse_from_channel (ic : in_channel) : Ast.expr option =
       exit 1
 
 let () =
-  match parse_from_channel stdin with
+  let file =
+    match Array.to_list Sys.argv with
+    | [ _ ] -> None
+    | [ _; f ] -> Some f
+    | _ ->
+        Printf.eprintf "Usage: stlc2m [file]\n";
+        exit 2
+  in
+  let ic, _file_label =
+    match file with None -> (stdin, "<stdin>") | Some f -> (open_in f, f)
+  in
+  match parse_from_channel ic with
   | None -> exit 0
   | Some e -> (
       match Checker.infer Checker.empty_env e with
