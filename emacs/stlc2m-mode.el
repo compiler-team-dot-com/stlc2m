@@ -91,6 +91,25 @@
      (format "[%s] %s" code msg)
      :checker 'stlc2m)))
 
+(defun stlc2m--push-response-to-flycheck (resp)
+  "Push server RESP (alist) into Flycheck for the current buffer."
+  (let ((ok (alist-get 'ok resp)))
+    (cond
+     ((not ok)
+      (let* ((err (alist-get 'error resp))
+	     (ecode (alist-get 'code err))
+	     (emsg (alist-get 'message err))
+	     (fe (flycheck-error-new-at
+		  1 1 'error
+		  (format "[%s] %s" ecode emsg)
+		  :checker 'stlc2m)))
+	;; Replace Flycheck errors in this buffer
+	(flycheck-report-current-errors (list fe))))
+     (t
+      (let* ((diags (alist-get 'diagnostics resp))
+	     (errs (mapcar #'stlc2m--diag->flycheck-error diags)))
+	(flycheck-report-current-errors errs))))))
+
 (defun stlc2m--buffer-uri ()
   "Return a file:// URI for current buffer, or a synthetic one."
   (if buffer-file-name
