@@ -284,7 +284,6 @@ Assumes line is 1-based; col is 0-based."
 			(stlc2m--problems-put-target srcbuf rline rcol0))))
                   (insert "\n"))))))))
 
-      (goto-char (point-min))
       (setq stlc2m--open-problems-buffer buf)
       (setq-local stlc2m--problems-source-buffer srcbuf)
       (display-buffer buf)))
