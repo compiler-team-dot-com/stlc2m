@@ -311,8 +311,6 @@ Assumes line is 1-based; col is 0-based."
 
 (define-derived-mode stlc2m-problems-mode special-mode "STLC2m-Problems"
   "Major mode for the STLC2m Problems buffer."
-  ;; (define-key stlc2m-problems-mode-map (kbd "RET") #'stlc2m-problems-visit)
-  ;; (define-key stlc2m-problems-mode-map (kbd "q") #'quit-window)
   (evil-define-key 'normal stlc2m-problems-mode-map (kbd "RET") #'stlc2m-problems-visit)
   (evil-define-key 'motion stlc2m-problems-mode-map (kbd "RET") #'stlc2m-problems-visit)
   (evil-define-key 'normal stlc2m-problems-mode-map (kbd "q")   #'quit-window)
