@@ -252,7 +252,11 @@ Assumes line is 1-based; col is 0-based."
                        (col0 (alist-get 'col start))
                        (related (alist-get 'related d)))
                   (insert (format "[%s/%s] %s\n" code sev msg))
+
+		  ;; Insert line with target
                   (insert (format "  at %d:%d\n" line col0))
+		  (stlc2m--problems-put-target srcbuf line col0)
+
                   (when (and (listp related) related)
                     (dolist (r related)
                       (let* ((rmsg (alist-get 'message r))
@@ -261,12 +265,58 @@ Assumes line is 1-based; col is 0-based."
                              (rline (alist-get 'line rstart))
                              (rcol0 (alist-get 'col rstart)))
                         (insert (format "    related: %s\n" rmsg))
-                        (insert (format "      -> %d:%d\n" rline rcol0)))))
+
+			;; Insert line with target
+                        (insert (format "      -> %d:%d\n" rline rcol0))
+			(stlc2m--problems-put-target srcbuf rline rcol0))))
                   (insert "\n"))))))))
 
       (goto-char (point-min))
-      (view-mode 1)
+      ;; (stlc2m-problems-mode)
       (display-buffer buf)))
+
+(defun stlc2m--problems-put-target (srcbuf line col0)
+  "Attach a jump target (SRCBUF, LINE, COL0) to the most recently inserted line."
+  (save-excursion
+    ;; If we're at beginning of a line, likely because we just inserted a newline,
+    ;; move back to the previous line.
+    (when (bolp)
+      (forward-line -1))
+    (let ((beg (line-beginning-position))
+          (end (line-end-position)))
+      (add-text-properties
+       beg end
+       `(stlc2m-target (,srcbuf ,line ,col0)
+         mouse-face highlight
+         help-echo "RET: jump to location")))))
+
+(defun stlc2m--goto-line-col (buf line col0)
+  "Jump in BUF to LINE (1-based) and COL0 (0-based)."
+  (with-current-buffer buf
+    (goto-char (point-min))
+    (forward-line (max 0 (1- (or line 1))))
+    (forward-char (max 0 (or col0 0)))))
+
+(defun stlc2m-problems-visit ()
+  "Jump to the source location at point in the STLC2m Problems buffer."
+  (interactive)
+  (let ((target (get-text-property (point) 'stlc2m-target)))
+    (unless target
+      (user-error "No location on this line"))
+    (pcase-let ((`(,srcbuf ,line ,col0) target))
+      (unless (buffer-live-p srcbuf)
+        (user-error "Source buffer no longer exists"))
+      (pop-to-buffer srcbuf)
+      (stlc2m--goto-line-col srcbuf line col0))))
+
+(define-derived-mode stlc2m-problems-mode special-mode "STLC2m-Problems"
+  "Major mode for the STLC2m Problems buffer."
+  ;; (define-key stlc2m-problems-mode-map (kbd "RET") #'stlc2m-problems-visit)
+  ;; (define-key stlc2m-problems-mode-map (kbd "q") #'quit-window)
+  (evil-define-key 'normal stlc2m-problems-mode-map (kbd "RET") #'stlc2m-problems-visit)
+  (evil-define-key 'motion stlc2m-problems-mode-map (kbd "RET") #'stlc2m-problems-visit)
+  (evil-define-key 'normal stlc2m-problems-mode-map (kbd "q")   #'quit-window)
+  (evil-define-key 'motion stlc2m-problems-mode-map (kbd "q")   #'quit-window))
 
 (defun stlc2m-problems ()
   "Show the STLC2m Problems buffer for the current source buffer.
