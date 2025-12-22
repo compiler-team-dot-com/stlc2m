@@ -19,8 +19,10 @@
 (defvar-local stlc2m--flycheck-last-id 0)
 ;; For "Problems" buffer
 (defvar stlc2m--problems-buffer-name "*stlc2m-problems*")
+(defvar stlc2m--open-problems-buffer nil) ;; The actual buffer object
 (defvar-local stlc2m--last-response nil)
 (defvar-local stlc2m--last-uri nil)
+(defvar-local stlc2m--problems-source-buffer nil)
 
 (defun stlc2m--ensure-server ()
   "Ensure the stlc2m server process is running and return it."
@@ -171,6 +173,12 @@
 		       (setq stlc2m--last-response resp)
 		       (setq stlc2m--last-uri (stlc2m--buffer-uri))
 
+		       (when (and stlc2m--open-problems-buffer
+				  (buffer-live-p stlc2m--open-problems-buffer))
+			 (when (and (boundp 'stlc2m--problems-source-buffer)
+				    (eq stlc2m--problems-source-buffer buf))
+			   (stlc2m--render-problems buf resp)))
+
                        ;; Ignore stale responses from older requests.
                        (when (= id stlc2m--flycheck-last-id)
                          (let ((ok (alist-get 'ok resp)))
@@ -277,6 +285,8 @@ Assumes line is 1-based; col is 0-based."
                   (insert "\n"))))))))
 
       (goto-char (point-min))
+      (setq stlc2m--open-problems-buffer buf)
+      (setq-local stlc2m--problems-source-buffer srcbuf)
       (display-buffer buf)))
 
 (defun stlc2m--problems-put-target (srcbuf line col0)
@@ -312,6 +322,12 @@ Assumes line is 1-based; col is 0-based."
         (user-error "Source buffer no longer exists"))
       (pop-to-buffer srcbuf)
       (stlc2m--goto-line-col srcbuf line col0))))
+
+;; Clear state when the problems buffer is killed
+(defun stlc2m--problems-buffer-killed ()
+  (when (eq (current-buffer) stlc2m--open-problems-buffer)
+    (setq stlc2m--open-problems-buffer nil)))
+(add-hook 'kill-buffer-hook #'stlc2m--problems-buffer-killed)
 
 (define-derived-mode stlc2m-problems-mode special-mode "STLC2m-Problems"
   "Major mode for the STLC2m Problems buffer."
