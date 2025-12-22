@@ -252,7 +252,9 @@ Assumes line is 1-based; col is 0-based."
                        (line (alist-get 'line start))
                        (col0 (alist-get 'col start))
                        (related (alist-get 'related d)))
-                  (insert (format "[%s/%s] %s\n" code sev msg))
+		  (let ((start (point)))
+                    (insert (format "[%s/%s] %s\n" code sev msg))
+		    (add-text-properties start (point) '(face error)))
 
 		  ;; Insert line with target
                   (insert (format "  at %d:%d\n" line col0))
@@ -265,7 +267,9 @@ Assumes line is 1-based; col is 0-based."
                              (rstart (alist-get 'start rrange))
                              (rline (alist-get 'line rstart))
                              (rcol0 (alist-get 'col rstart)))
-                        (insert (format "    related: %s\n" rmsg))
+			(let ((start (point)))
+                          (insert (format "    related: %s\n" rmsg))
+			  (add-text-properties start (point) '(face font-lock-comment-face)))
 
 			;; Insert line with target
                         (insert (format "      -> %d:%d\n" rline rcol0))
