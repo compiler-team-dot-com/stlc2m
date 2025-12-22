@@ -226,6 +226,7 @@ Assumes line is 1-based; col is 0-based."
   "Render RESP (alist) for SRCBUF into the problems buffer."
   (let ((buf (get-buffer-create stlc2m--problems-buffer-name)))
     (with-current-buffer buf
+      (stlc2m-problems-mode)
       (setq buffer-read-only nil)
       (erase-buffer)
 
@@ -272,7 +273,6 @@ Assumes line is 1-based; col is 0-based."
                   (insert "\n"))))))))
 
       (goto-char (point-min))
-      ;; (stlc2m-problems-mode)
       (display-buffer buf)))
 
 (defun stlc2m--problems-put-target (srcbuf line col0)
