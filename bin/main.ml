@@ -4,31 +4,23 @@ let usage () =
   Printf.eprintf "Usage: stlc2m [--server] [file]\n";
   exit 2
 
-let parse_from_channel (ic : in_channel) : Ast.expr option =
-  let lexbuf = Lexing.from_channel ic in
-  try Parser.prog Lexer.token lexbuf with
-  | Lexer.Lexing_error (msg, pos) ->
+type mode = Server | Stdin | File of string
+
+let run_ic ic =
+  match Compile.from_channel ~version:0 ic with
+  | Error (Compile.LexError { msg; pos }) ->
       Printf.eprintf "Lex error at %d:%d: %s\n" pos.Lexing.pos_lnum
         (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
         msg;
       exit 1
-  | Parser.Error ->
-      let pos = Lexing.lexeme_start_p lexbuf in
+  | Error (Compile.ParseError { pos }) ->
       Printf.eprintf "Parse error at %d:%d\n" pos.Lexing.pos_lnum
         (pos.Lexing.pos_cnum - pos.Lexing.pos_bol);
       exit 1
-
-type mode = Server | Stdin | File of string
-
-let run_ic ic =
-  match parse_from_channel ic with
-  | None -> exit 0
-  | Some e -> (
-      match Checker.infer Checker.empty_env e with
-      | Ok (_ty, _deps) -> exit 0
-      | Error d ->
-          print_endline (Diag.to_human d);
-          exit 1)
+  | Ok { snapshot = Some snap; result = Some (Error err) } ->
+      print_endline (Diag.to_human @@ Compile.diag_of_error snap err);
+      exit 1
+  | _ -> exit 0
 
 let () =
   let m =

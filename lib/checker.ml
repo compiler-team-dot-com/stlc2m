@@ -1,8 +1,15 @@
 open Ast
+open Id_gen
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
-type stack_binding = { ty : ty; binder_range : range }
+type stack_binding = {
+  ty : ty;
+  binder_id : Node_id.t;
+  binder_range : range;
+  kw_range : range;
+}
+
 type env = { heap : ty StringMap.t; stack : stack_binding StringMap.t }
 
 let empty_env : env = { heap = StringMap.empty; stack = StringMap.empty }
@@ -26,33 +33,39 @@ type infer_result = ty * StringSet.t
 
 let union_deps (a : StringSet.t) (b : StringSet.t) = StringSet.union a b
 
+module Evidence = struct
+  type stack_escape = {
+    export_id : Node_id.t;
+    escaping_vars : string list; (* canonical list, stable order *)
+    binders : (string * Node_id.t) list; (* stack var -> binder node id *)
+  }
+end
+
+type error =
+  | EUnboundVar of { range : range; x : string }
+  | EExpectedBool of { range : range }
+  | ETypeMismatch of { range : range; expected : ty; got : ty }
+  | EExpectedFun of { range : range }
+  | EStackEscape of Evidence.stack_escape
+
 (* The "export" check *)
-let rec infer (env : env) (e : expr) : (infer_result, Diag.t) result =
+let rec infer (env : env) (e : expr) : (infer_result, error) result =
   match e.node with
   | EInt _ -> Ok (TInt, StringSet.empty)
   | EBool _ -> Ok (TBool, StringSet.empty)
   | EVar x -> (
       match lookup env x with
-      | None ->
-          Error
-            (Diag.error ~code:"E_UNBOUND_VAR" ~range:e.range
-               ("Unbound variable: " ^ x))
+      | None -> Error (EUnboundVar { range = e.range; x })
       | Some (`Heap t) -> Ok (t, StringSet.empty)
       | Some (`Stack b) -> Ok (b.ty, StringSet.singleton x))
   | EIf (c, tbr, fbr) ->
       let* ct, cdeps = infer env c in
-      if ct <> TBool then
-        Error
-          (Diag.error ~code:"E_EXPECTED_BOOL" ~range:c.range
-             "Expected Bool in if-condition")
+      if ct <> TBool then Error (EExpectedBool { range = c.range })
       else
         let* tt, tdeps = infer env tbr in
         let* ft, fdeps = infer env fbr in
         if tt <> ft then
-          Error
-            (Diag.error ~code:"E_TYPE_MISMATCH" ~range:e.range
-               ("If branches have different types: " ^ Ast.string_of_ty tt
-              ^ " vs " ^ Ast.string_of_ty ft))
+          Error (ETypeMismatch { range = e.range; expected = tt; got = ft })
         else Ok (tt, union_deps cdeps (union_deps tdeps fdeps))
   | ELam (x, _xr, xty, body) ->
       let env' = extend_heap env x xty in
@@ -64,23 +77,20 @@ let rec infer (env : env) (e : expr) : (infer_result, Diag.t) result =
       match fty with
       | TArrow (dom, cod) ->
           if dom <> aty then
-            Error
-              (Diag.error ~code:"E_TYPE_MISMATCH" ~range:e.range
-                 ("Function expects " ^ Ast.string_of_ty dom
-                ^ " but argument has " ^ Ast.string_of_ty aty))
+            Error (ETypeMismatch { range = e.range; expected = dom; got = aty })
           else Ok (cod, union_deps fdeps adeps)
-      | _ ->
-          Error
-            (Diag.error ~code:"E_EXPECTED_FUN" ~range:f.range
-               "Expected a function in application"))
+      | _ -> Error (EExpectedFun { range = f.range }))
   | ELet (x, _xr, e1, e2) ->
       let* t1, d1 = infer env e1 in
       let env' = extend_heap env x t1 in
       let* t2, d2 = infer env' e2 in
       Ok (t2, union_deps d1 d2)
-  | ELetStack (x, xr, e1, e2) ->
+  | ELetStack { kw_range; x; x_range; e1; e2 } ->
       let* t1, d1 = infer env e1 in
-      let env' = extend_stack env x { ty = t1; binder_range = xr } in
+      let env' =
+        extend_stack env x
+          { ty = t1; binder_id = e.id; binder_range = x_range; kw_range }
+      in
       let* t2, d2 = infer env' e2 in
       Ok (t2, union_deps d1 d2)
   | EExport e1 ->
@@ -88,21 +98,46 @@ let rec infer (env : env) (e : expr) : (infer_result, Diag.t) result =
       if StringSet.is_empty deps then Ok (t1, StringSet.empty)
       else
         (* Pick witnesses and point to their binders *)
-        let related =
-          deps |> StringSet.to_list
+        let escaping_vars =
+          deps |> StringSet.to_list |> List.sort String.compare
+        in
+        let binders =
+          escaping_vars
           |> List.filter_map (fun v ->
               match StringMap.find_opt v env.stack with
               | None -> None
-              | Some b ->
-                  Some
-                    {
-                      Diag.range = b.binder_range;
-                      message = "Stack binding of " ^ v;
-                    })
+              | Some b -> Some (v, b.binder_id))
         in
-        Error
-          (Diag.error ~code:"E_STACK_ESCAPE" ~range:e.range ~related
-             "export requires a stack-closed expressions, but stack-bound \
-              variables are referenced")
+        Error (EStackEscape { export_id = e1.id; binders; escaping_vars })
 
-and ( let* ) r f = match r with Ok v -> f v | Error _ as e -> e
+and ( let* ) r (f : infer_result -> (infer_result, error) result) =
+  match r with Ok v -> f v | Error _ as e -> e
+
+let diag_of_error (idx : Ast_index.t) (err : error) : Diag.t =
+  match err with
+  | EUnboundVar { range; x } ->
+      Diag.error ~code:"E_UNBOUND_VAR" ~range ("Unbound variable: " ^ x)
+  | EExpectedBool { range } ->
+      Diag.error ~code:"E_EXPECTED_BOOL" ~range "Expected Bool in if-condition"
+  | ETypeMismatch { range; expected; got } ->
+      Diag.error ~code:"E_TYPE_MISMATCH" ~range
+        ("If branches have different types: " ^ Ast.string_of_ty expected
+       ^ " vs " ^ Ast.string_of_ty got)
+  | EExpectedFun { range } ->
+      Diag.error ~code:"E_EXPECTED_FUN" ~range
+        "Expected a function in application"
+  | EStackEscape ev ->
+      (* Pick witnesses and point to their binders *)
+      let related =
+        ev.binders
+        |> List.map (fun (x, id) ->
+            {
+              Diag.range = Ast_index.range idx id;
+              message = "Stack binding of " ^ x;
+            })
+      in
+      Diag.error ~code:"E_STACK_ESCAPE"
+        ~range:(Ast_index.range idx ev.export_id)
+        ~related
+        "export requires a stack-closed expressions, but stack-bound variables \
+         are referenced"

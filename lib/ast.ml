@@ -1,7 +1,9 @@
+open Id_gen
+
 type range = { start_pos : Lexing.position; end_pos : Lexing.position }
 type ty = TInt | TBool | TArrow of ty * ty
 
-type expr = { node : expr_node; range : range }
+type expr = { id : Node_id.t; node : expr_node; range : range }
 
 and expr_node =
   | EVar of string
@@ -11,15 +13,23 @@ and expr_node =
   | ELam of string * range * ty * expr (* fun (x : ty) -> body *)
   | EApp of expr * expr
   | ELet of string * range * expr * expr (* let x = e1 in e2 *)
-  | ELetStack of string * range * expr * expr (* letstack x = e1 in e2 *)
+  | ELetStack of {
+      kw_range : range;
+      x : string;
+      x_range : range;
+      e1 : expr;
+      e2 : expr;
+    }
   | EExport of expr (* export e *)
 
 let mk_range (start_pos : Lexing.position) (end_pos : Lexing.position) : range =
   { start_pos; end_pos }
 
-let mk_range_node (sp : Lexing.position) (ep : Lexing.position)
+let mk_range_node (g : Id_gen.t) (sp : Lexing.position) (ep : Lexing.position)
     (node : expr_node) : expr =
-  { node; range = mk_range sp ep }
+  let id = Id_gen.fresh g in
+  let range = mk_range sp ep in
+  { id; node; range }
 
 let string_of_position (p : Lexing.position) : string =
   (* Lexing.position.pos_lnum is 1-based; pos_cnum and pos_bol allow column computation *)

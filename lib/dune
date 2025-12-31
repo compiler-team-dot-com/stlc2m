@@ -1,15 +1,22 @@
 (ocamllex
-  (modules lexer))
+ (modules lexer))
 
 (menhir
- (modules parser)
- (flags --table --strict))
+ (modules tokens)
+ (flags --only-tokens)
+ (explain false))
+
+; Use --fixed-exception so we can handle parsing errors as Parsing.Parse_error
+; when we don't have access to a Parser instance.
+(menhir
+ (modules tokens parser)
+ (merge_into parser)
+ (flags --fixed-exception --external-tokens Tokens --table --strict))
 
 (library
  (name stlc2m)
  (inline_tests)
- (modules server ast diag checker parser lexer)
+ (modules tokens compile id_gen server actions ast ast_index diag checker parser lexer)
  (libraries core_unix menhirLib yojson)
  (preprocess
   (pps ppx_inline_test)))
-

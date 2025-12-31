@@ -41,15 +41,13 @@ let mk_ok ~id ~diags : J.t =
 
 (* Parse+check from raw source text. *)
 let check_text (text : string) : Diag.t list =
-  let lexbuf = Lexing.from_string text in
-  (* optional: set a fake filename for position reporting *)
-  (* lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = "<buffer>"}; *)
-  match Parser.prog Lexer.token lexbuf with
-  | None -> []
-  | Some e -> (
-      match Checker.infer Checker.empty_env e with
-      | Ok _ -> []
-      | Error d -> [ d ])
+  match Compile.from_string ~version:0 ~fname:"<buffer>" text with
+  | Error _parse_err -> []
+  | Ok { snapshot = _; result = None } -> []
+  | Ok { snapshot = _; result = Some (Ok _ok) } -> []
+  | Ok { snapshot = None; result = Some (Error _err) } -> []
+  | Ok { snapshot = Some snap; result = Some (Error err) } ->
+      [ Compile.diag_of_error snap err ]
 
 let handle_request (json : J.t) : J.t =
   let id = match JU.member "id" json with `Null -> `Null | v -> v in
@@ -72,7 +70,7 @@ let handle_request (json : J.t) : J.t =
         Printf.sprintf "Lex error at %s: %s" (Ast.string_of_position pos) msg
       in
       mk_error ~id ~code:"E_LEX" ~message
-  | Parser.Error -> mk_error ~id ~code:"E_PARSE" ~message:"Parse error"
+  | Parsing.Parse_error -> mk_error ~id ~code:"E_PARSE" ~message:"Parse error"
   | exn -> mk_error ~id ~code:"E_INTERNAL" ~message:(Printexc.to_string exn)
 
 let run () : unit =
