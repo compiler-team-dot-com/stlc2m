@@ -1,19 +1,12 @@
 module type S = Checker_intf.S
 
-module Make
-    (Ast : Ast.S)
-    (Ast_index :
-      Ast_index.S with type range = Ast.Range.t and type node_id = Ast.node_id)
-    (Diag : Diag.S with module Range = Ast.Range) =
-struct
+module Make (Ast : Ast.S) = struct
   open Ast
 
   type expr = Ast.expr
   type ty = Ast.ty
   type range = Ast.Range.t
   type node_id = Ast.node_id
-  type ast_index = Ast_index.t
-  type diag = Diag.t
 
   module StringSet = Set.Make (String)
   module StringMap = Map.Make (String)
@@ -137,34 +130,4 @@ struct
     match r with Ok v -> f v | Error _ as e -> e
 
   let infer (e : expr) : (infer_result, error) result = inf empty_env e
-
-  let diag_of_error (idx : Ast_index.t) (err : error) : Diag.t =
-    match err with
-    | EUnboundVar { range; x } ->
-        Diag.error ~code:"E_UNBOUND_VAR" ~range ("Unbound variable: " ^ x)
-    | EExpectedBool { range } ->
-        Diag.error ~code:"E_EXPECTED_BOOL" ~range
-          "Expected Bool in if-condition"
-    | ETypeMismatch { range; expected; got } ->
-        Diag.error ~code:"E_TYPE_MISMATCH" ~range
-          ("If branches have different types: " ^ string_of_ty expected ^ " vs "
-         ^ string_of_ty got)
-    | EExpectedFun { range } ->
-        Diag.error ~code:"E_EXPECTED_FUN" ~range
-          "Expected a function in application"
-    | EStackEscape ev ->
-        (* Pick witnesses and point to their binders *)
-        let related =
-          ev.binders
-          |> List.map (fun (x, id) ->
-              {
-                Diag.range = Ast_index.range idx id;
-                message = "Stack binding of " ^ x;
-              })
-        in
-        Diag.error ~code:"E_STACK_ESCAPE"
-          ~range:(Ast_index.range idx ev.export_id)
-          ~related
-          "export requires a stack-closed expressions, but stack-bound \
-           variables are referenced"
 end
