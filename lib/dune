@@ -16,7 +16,8 @@
 (library
  (name stlc2m)
  (inline_tests)
- (modules tokens compile id_gen server actions ast ast_index diag checker parser lexer)
+ (modules parse_env_intf parse_env tokens compile id_gen server ast ast_index_intf ast_index diag_intf diag checker_intf checker parser lexer)
+ (modules_without_implementation parse_env_intf ast_index_intf checker_intf diag_intf)
  (libraries core_unix menhirLib yojson)
  (preprocess
   (pps ppx_inline_test)))

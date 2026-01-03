@@ -1,16 +1,18 @@
-open Ast
-open Checker
-
-type snapshot
-
-type t = {
-  snapshot : snapshot option;
-  result : (ty * StringSet.t, error) result option;
-}
+module Ast : Ast.S
+module Diag : Diag.S
 
 type parse_error =
   | LexError of { msg : string; pos : Lexing.position }
   | ParseError of { pos : Lexing.position }
+
+type snapshot
+type error
+type infer_result
+
+type t = {
+  snapshot : snapshot option;
+  result : (infer_result, error) result option;
+}
 
 val from_string :
   ?version:int -> ?fname:string -> string -> (t, parse_error) result

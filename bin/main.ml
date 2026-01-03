@@ -1,4 +1,5 @@
 open Stlc2m
+module Diag = Compile.Diag
 
 let usage () =
   Printf.eprintf "Usage: stlc2m [--server] [file]\n";

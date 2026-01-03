@@ -1,4 +1,5 @@
-open Ast
+module Ast = Compile.Ast
+module Diag = Compile.Diag
 module J = Yojson.Safe
 module JU = Yojson.Safe.Util
 
@@ -7,7 +8,7 @@ let pos_to_json (p : Lexing.position) : J.t =
   let col = p.pos_cnum - p.pos_bol in
   `Assoc [ ("line", `Int line); ("col", `Int col) ]
 
-let range_to_json (r : range) : J.t =
+let range_to_json (r : Diag.range) : J.t =
   `Assoc [ ("start", pos_to_json r.start_pos); ("end", pos_to_json r.end_pos) ]
 
 let related_to_json (r : Diag.related) : J.t =
@@ -67,7 +68,9 @@ let handle_request (json : J.t) : J.t =
       mk_error ~id ~code:"E_PROTOCOL" ~message:("Bad request: " ^ msg)
   | Lexer.Lexing_error (msg, pos) ->
       let message =
-        Printf.sprintf "Lex error at %s: %s" (Ast.string_of_position pos) msg
+        Printf.sprintf "Lex error at %s: %s"
+          (Ast.Range.string_of_position pos)
+          msg
       in
       mk_error ~id ~code:"E_LEX" ~message
   | Parsing.Parse_error -> mk_error ~id ~code:"E_PARSE" ~message:"Parse error"

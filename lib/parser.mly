@@ -1,13 +1,14 @@
+%parameter <Env : Parse_env.S>
+
+%start <Env.Ast.expr option> prog
+
 %{
+open Env.Ast
 
-open Ast
-
-let id_gen = Id_gen.create ()
-
+let env = Env.create ()
+let mk_range_node = Env.mk_range_node
+let mk_range = Env.mk_range
 %}
-
-%parameter <>
-%start <Ast.expr option> prog
 
 %%
 
@@ -24,47 +25,47 @@ expr:
   | LET; x = IDENT; EQ; e = expr; IN; body = expr
       {
 	let xr = mk_range $startpos(x) $endpos(x) in
-	mk_range_node id_gen $startpos $endpos (ELet (x, xr, e, body))
+	mk_range_node env $startpos $endpos (ELet (x, xr, e, body))
       }
   | LETSTACK; x = IDENT; EQ; e1 = expr; IN; e2 = expr
       {
 	let x_range = mk_range $startpos(x) $endpos(x) in
 	let kw_range = mk_range $startpos($1) $endpos($1) in
-        mk_range_node id_gen $startpos $endpos (ELetStack {kw_range; x; x_range; e1; e2})
+        mk_range_node env $startpos $endpos (ELetStack {kw_range; x; x_range; e1; e2})
       }
   | IF; e1 = expr; THEN; e2 = expr; ELSE; e3 = expr
-      { mk_range_node id_gen $startpos $endpos (EIf (e1, e2, e3)) }
+      { mk_range_node env $startpos $endpos (EIf (e1, e2, e3)) }
   | FUN; LPAREN; x = IDENT; COLON; ty = ty; RPAREN; ARROW; e = expr
       {
 	let xr = mk_range $startpos(x) $endpos(x) in
-        mk_range_node id_gen $startpos $endpos (ELam (x, xr, ty, e))
+        mk_range_node env $startpos $endpos (ELam (x, xr, ty, e))
       }
 /* EXPORT expr_app (not EXPORT expr) is deliberate: it avoids parsing "export let ..."
 *  without parentheses. To have "export (let ...)", one can always write parentheses.
 *  Keeps the grammar unambiguous early.
 */
   | EXPORT; e = expr_app
-      { mk_range_node id_gen $startpos $endpos (EExport e) }
+      { mk_range_node env $startpos $endpos (EExport e) }
   | e = expr_app
       { e }
 
 /* Application: left-associative sequence of atoms */
 expr_app:
   | e = expr_app; a = atom
-      { mk_range_node id_gen $startpos $endpos (EApp (e, a)) }
+      { mk_range_node env $startpos $endpos (EApp (e, a)) }
   | a = atom
       { a }
 
 /* Atoms */
 atom:
   | x = IDENT
-      { mk_range_node id_gen $startpos $endpos (EVar x) }
+      { mk_range_node env $startpos $endpos (EVar x) }
   | i = INT
-      { mk_range_node id_gen $startpos $endpos (EInt i) }
+      { mk_range_node env $startpos $endpos (EInt i) }
   | TRUE
-      { mk_range_node id_gen $startpos $endpos (EBool true) }
+      { mk_range_node env $startpos $endpos (EBool true) }
   | FALSE
-      { mk_range_node id_gen $startpos $endpos (EBool false) }
+      { mk_range_node env $startpos $endpos (EBool false) }
   | LPAREN; e = expr; RPAREN
       { e }
 

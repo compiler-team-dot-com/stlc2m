@@ -1,11 +1,7 @@
-open Ast
-open Id_gen
+module type S = Ast_index_intf.S
 
-type t
-
-exception Bug of string
-
-val build : expr -> t
-val expr : t -> Node_id.t -> expr
-val range : t -> Node_id.t -> range
-val parent : t -> Node_id.t -> Node_id.t option
+module Make (Ast : Ast.S) :
+  S
+    with type range = Ast.range
+     and type expr = Ast.expr
+     and type node_id = Ast.node_id

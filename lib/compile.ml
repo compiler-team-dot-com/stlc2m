@@ -1,5 +1,14 @@
-open Ast
-open Checker
+module IdGen = Id_gen.Make ()
+module Ast = Ast.Make (IdGen.Node_id)
+module Ast_index = Ast_index.Make (Ast)
+module Diag = Diag.Make (Ast)
+module Checker = Checker.Make (Ast) (Ast_index) (Diag)
+module Env = Parse_env.Make (Ast) (IdGen)
+
+type error = Checker.error
+type infer_result = Checker.infer_result
+
+module StringSet = Set.Make (String)
 
 type parse_error =
   | LexError of { msg : string; pos : Lexing.position }
@@ -13,7 +22,7 @@ type snapshot = {
 
 type t = {
   snapshot : snapshot option;
-  result : (ty * StringSet.t, error) result option;
+  result : (Checker.infer_result, error) result option;
 }
 
 let mk_lexbuf_from_string ?fname (s : string) =
@@ -23,16 +32,17 @@ let mk_lexbuf_from_string ?fname (s : string) =
   | Some fn -> lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = fn });
   lexbuf
 
-let parse_prog (lexbuf : Lexing.lexbuf) : (expr option, parse_error) result =
-  let module P = Parser.Make () in
+let parse_prog (lexbuf : Lexing.lexbuf) : (Ast.expr option, parse_error) result
+    =
+  let module P = Parser.Make (Env) in
   try Ok (P.prog Lexer.token lexbuf) with
   | Lexer.Lexing_error (msg, pos) -> Error (LexError { msg; pos })
   | Parsing.Parse_error ->
       let pos = Lexing.lexeme_start_p lexbuf in
       Error (ParseError { pos })
 
-let build_snapshot ~(source : string) ~(root : expr) ~(version : int) : snapshot
-    =
+let build_snapshot ~(source : string) ~(root : Ast.expr) ~(version : int) :
+    snapshot =
   let _ = source in
   let _ = version in
   let index = Ast_index.build root in
@@ -47,7 +57,7 @@ let from_string ?(version = 0) ?fname (source : string) :
   | Ok None -> Ok { snapshot = None; result = None }
   | Ok (Some root) ->
       let snapshot = build_snapshot ~source ~root ~version in
-      let result = Checker.infer Checker.empty_env root in
+      let result = Checker.infer root in
       Ok { snapshot = Some snapshot; result = Some result }
 
 let from_channel ?(version = 0) ?fname (ic : in_channel) :
