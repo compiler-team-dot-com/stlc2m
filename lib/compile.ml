@@ -8,6 +8,9 @@ module Checker = Checker.Make (Ast)
 module Checker_report = Checker_report.Make (Ast) (Diag_core) (Checker)
 module Env = Parse_env.Make (Ast) (IdGen)
 
+module Actions =
+  Actions.Make (Ast) (Ast_index) (Action_id) (Checker) (Diag_core)
+
 type error = Checker.error
 type infer_result = Checker.infer_result
 
@@ -70,3 +73,42 @@ let from_channel ?(version = 0) ?fname (ic : in_channel) :
 
 let diag_of_error (snap : snapshot) (err : error) : Diag.t =
   err |> Checker_report.of_error |> Diag_render.render snap.index
+
+type action_kind = Quickfix | Explain
+
+type action = {
+  id : int;
+  kind : action_kind;
+  title : string;
+  targets : Ast.node_id list;
+  highlights : Ast.range list;
+  rationale : string;
+}
+
+let report_of_error (snap : snapshot) (err : error) : Diag.t * action list =
+  let diag_core = Checker_report.of_error err in
+  let diag = Diag_render.render snap.index diag_core in
+
+  (* Fresh action ids for this response only. Later you can replace with a stateful
+     registry (server-managed) keyed by a stable Action_id.t. *)
+  let next =
+    let r = ref 0 in
+    fun () ->
+      incr r;
+      !r
+  in
+
+  let actions =
+    Actions.propose_actions ~next_id:next ~root:snap.root ~index:snap.index
+      ~diag:diag_core err
+    |> List.map (fun (a : Actions.t) ->
+        {
+          id = Action_id.to_int a.id;
+          kind = (match a.kind with Quickfix -> Quickfix | Explain -> Explain);
+          title = a.title;
+          targets = a.targets;
+          highlights = a.highlights;
+          rationale = a.rationale;
+        })
+  in
+  (diag, actions)

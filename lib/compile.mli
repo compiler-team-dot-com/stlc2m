@@ -21,3 +21,18 @@ val from_channel :
   ?version:int -> ?fname:string -> in_channel -> (t, parse_error) result
 
 val diag_of_error : snapshot -> error -> Diag.t
+
+type action_kind = Quickfix | Explain
+
+type action = {
+  id : Action_id.t;
+  kind : action_kind;
+  title : string;
+  (* Semantic targets (node_ids) are included for future “apply action” messages. *)
+  targets : Ast.node_id list;
+  (* Derived UI highlights (ranges). *)
+  highlights : Ast.range list;
+  rationale : string;
+}
+
+val report_of_error : snapshot -> error -> Diag.t * action list

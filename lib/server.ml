@@ -12,23 +12,25 @@ let mk_error ~id ~code ~message : J.t =
       ("error", `Assoc [ ("code", `String code); ("message", `String message) ]);
     ]
 
-let mk_ok ~id ~diags : J.t =
+let mk_ok ~id ~diags ~actions : J.t =
   `Assoc
     [
       ("id", id);
       ("ok", `Bool true);
       ("diagnostics", `List (List.map Diag_json.diag_to_json diags));
+      ("actions", `List (List.map Actions_json.action_to_json actions));
     ]
 
 (* Parse+check from raw source text. *)
-let check_text (text : string) : Diag.t list =
+let check_text (text : string) : Diag.t list * Compile.action list =
   match Compile.from_string ~version:0 ~fname:"<buffer>" text with
-  | Error _parse_err -> []
-  | Ok { snapshot = _; result = None } -> []
-  | Ok { snapshot = _; result = Some (Ok _ok) } -> []
-  | Ok { snapshot = None; result = Some (Error _err) } -> []
+  | Error _parse_err -> ([], [])
+  | Ok { snapshot = _; result = None } -> ([], [])
+  | Ok { snapshot = _; result = Some (Ok _ok) } -> ([], [])
+  | Ok { snapshot = None; result = Some (Error _err) } -> ([], [])
   | Ok { snapshot = Some snap; result = Some (Error err) } ->
-      [ Compile.diag_of_error snap err ]
+      let diag, actions = Compile.report_of_error snap err in
+      ([ diag ], actions)
 
 let handle_request (json : J.t) : J.t =
   let id = match JU.member "id" json with `Null -> `Null | v -> v in
@@ -37,8 +39,8 @@ let handle_request (json : J.t) : J.t =
     match method_ with
     | "check" ->
         let text = JU.member "text" json |> JU.to_string in
-        let diags = check_text text in
-        mk_ok ~id ~diags
+        let diags, actions = check_text text in
+        mk_ok ~id ~diags ~actions
     | _ ->
         mk_error ~id ~code:"E_PROTOCOL" ~message:("Unknown method: " ^ method_)
   with
