@@ -1,28 +1,8 @@
 module Ast = Compile.Ast
 module Diag = Compile.Diag
+module Diag_json = Diag_json.Make (Diag)
 module J = Yojson.Safe
 module JU = Yojson.Safe.Util
-
-let pos_to_json (p : Lexing.position) : J.t =
-  let line = p.pos_lnum in
-  let col = p.pos_cnum - p.pos_bol in
-  `Assoc [ ("line", `Int line); ("col", `Int col) ]
-
-let range_to_json (r : Diag.range) : J.t =
-  `Assoc [ ("start", pos_to_json r.start_pos); ("end", pos_to_json r.end_pos) ]
-
-let related_to_json (r : Diag.related) : J.t =
-  `Assoc [ ("range", range_to_json r.range); ("message", `String r.message) ]
-
-let diag_to_json (d : Diag.t) : J.t =
-  `Assoc
-    [
-      ("code", `String d.code);
-      ("message", `String d.message);
-      ("severity", `String (Diag.severity_to_string d.severity));
-      ("range", range_to_json d.range);
-      ("related", `List (List.map related_to_json d.related));
-    ]
 
 let mk_error ~id ~code ~message : J.t =
   `Assoc
@@ -37,7 +17,7 @@ let mk_ok ~id ~diags : J.t =
     [
       ("id", id);
       ("ok", `Bool true);
-      ("diagnostics", `List (List.map diag_to_json diags));
+      ("diagnostics", `List (List.map Diag_json.diag_to_json diags));
     ]
 
 (* Parse+check from raw source text. *)
