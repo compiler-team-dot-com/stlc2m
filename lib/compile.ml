@@ -2,8 +2,10 @@ module IdGen = Id_gen.Make ()
 module Ast = Ast.Make (IdGen.Node_id)
 module Ast_index = Ast_index.Make (Ast)
 module Diag = Diag.Make (Ast)
+module Diag_core = Diag_core.Make (Ast)
+module Diag_render = Diag_render.Make (Ast) (Ast_index) (Diag) (Diag_core)
 module Checker = Checker.Make (Ast)
-module Checker_report = Checker_report.Make (Ast) (Ast_index) (Diag) (Checker)
+module Checker_report = Checker_report.Make (Ast) (Diag_core) (Checker)
 module Env = Parse_env.Make (Ast) (IdGen)
 
 type error = Checker.error
@@ -67,4 +69,4 @@ let from_channel ?(version = 0) ?fname (ic : in_channel) :
   from_string ~version ?fname source
 
 let diag_of_error (snap : snapshot) (err : error) : Diag.t =
-  Checker_report.of_error snap.index err
+  err |> Checker_report.of_error |> Diag_render.render snap.index

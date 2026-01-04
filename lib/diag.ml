@@ -1,5 +1,3 @@
-(* Diagnostic record + rendering *)
-
 module type S = Diag_intf.S
 
 module Make (Ast : Ast.S) = struct

@@ -1,7 +1,6 @@
 module type S = sig
-  type ast_index
   type error
-  type diag
+  type diag_core
 
-  val of_error : ast_index -> error -> diag
+  val of_error : error -> diag_core
 end

@@ -18,9 +18,10 @@
  (inline_tests)
  (modules parse_env_intf parse_env tokens compile id_gen server ast
  	  ast_index_intf ast_index diag_intf diag checker_intf checker
-	  parser lexer checker_report_intf checker_report)
+	  parser lexer checker_report_intf checker_report
+	  diag_core_intf diag_core diag_render)
  (modules_without_implementation parse_env_intf ast_index_intf checker_intf
- 				 diag_intf checker_report_intf)
+ 				 diag_intf checker_report_intf diag_core_intf)
  (libraries core_unix menhirLib yojson)
  (preprocess
   (pps ppx_inline_test)))

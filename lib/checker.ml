@@ -5,7 +5,6 @@ module Make (Ast : Ast.S) = struct
 
   type expr = Ast.expr
   type ty = Ast.ty
-  type range = Ast.Range.t
   type node_id = Ast.node_id
 
   module StringSet = Set.Make (String)
@@ -44,16 +43,16 @@ module Make (Ast : Ast.S) = struct
   module Evidence = struct
     type stack_escape = {
       export_id : node_id;
-      _escaping_vars : string list; (* canonical list, stable order *)
+      escaping_vars : string list; (* canonical list, stable order *)
       binders : (string * node_id) list; (* stack var -> binder node id *)
     }
   end
 
   type error =
-    | EUnboundVar of { range : range; x : string }
-    | EExpectedBool of { range : range }
-    | ETypeMismatch of { range : range; expected : ty; got : ty }
-    | EExpectedFun of { range : range }
+    | EUnboundVar of { id : node_id; x : string }
+    | EExpectedBool of { id : node_id }
+    | ETypeMismatch of { id : node_id; expected : ty; got : ty }
+    | EExpectedFun of { id : node_id }
     | EStackEscape of Evidence.stack_escape
 
   (* The "export" check *)
@@ -63,17 +62,17 @@ module Make (Ast : Ast.S) = struct
     | EBool _ -> Ok (TBool, StringSet.empty)
     | EVar x -> (
         match lookup env x with
-        | None -> Error (EUnboundVar { range = e.range; x })
+        | None -> Error (EUnboundVar { id = e.id; x })
         | Some (`Heap t) -> Ok (t, StringSet.empty)
         | Some (`Stack b) -> Ok (b.ty, StringSet.singleton x))
     | EIf (c, tbr, fbr) ->
         let* ct, cdeps = inf env c in
-        if ct <> TBool then Error (EExpectedBool { range = c.range })
+        if ct <> TBool then Error (EExpectedBool { id = c.id })
         else
           let* tt, tdeps = inf env tbr in
           let* ft, fdeps = inf env fbr in
           if tt <> ft then
-            Error (ETypeMismatch { range = e.range; expected = tt; got = ft })
+            Error (ETypeMismatch { id = e.id; expected = tt; got = ft })
           else Ok (tt, union_deps cdeps (union_deps tdeps fdeps))
     | ELam (x, _xr, xty, body) ->
         let env' = extend_heap env x xty in
@@ -85,10 +84,9 @@ module Make (Ast : Ast.S) = struct
         match fty with
         | TArrow (dom, cod) ->
             if dom <> aty then
-              Error
-                (ETypeMismatch { range = e.range; expected = dom; got = aty })
+              Error (ETypeMismatch { id = e.id; expected = dom; got = aty })
             else Ok (cod, union_deps fdeps adeps)
-        | _ -> Error (EExpectedFun { range = f.range }))
+        | _ -> Error (EExpectedFun { id = f.id }))
     | ELet (x, _xr, e1, e2) ->
         let* t1, d1 = inf env e1 in
         let env' = extend_heap env x t1 in
@@ -122,9 +120,7 @@ module Make (Ast : Ast.S) = struct
                 | None -> None
                 | Some b -> Some (v, b.binder_id))
           in
-          Error
-            (EStackEscape
-               { export_id = e1.id; binders; _escaping_vars = escaping_vars })
+          Error (EStackEscape { export_id = e1.id; binders; escaping_vars })
 
   and ( let* ) r (f : infer_result -> (infer_result, error) result) =
     match r with Ok v -> f v | Error _ as e -> e

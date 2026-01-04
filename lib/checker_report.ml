@@ -2,46 +2,37 @@ module type S = Checker_report_intf.S
 
 module Make
     (Ast : Ast.S)
-    (Ast_index :
-      Ast_index.S with type range = Ast.Range.t and type node_id = Ast.node_id)
-    (Diag : Diag.S with module Range = Ast.Range)
+    (Diag_core :
+      Diag_core.S with type node_id = Ast.node_id and type ty = Ast.ty)
     (Checker :
       Checker.S
         with type expr = Ast.expr
          and type ty = Ast.ty
-         and type range = Ast.Range.t
          and type node_id = Ast.node_id) =
 struct
-  type ast_index = Ast_index.t
   type error = Checker.error
-  type diag = Diag.t
+  type diag_core = Diag_core.t
 
-  let of_error (idx : Ast_index.t) (err : Checker.error) : Diag.t =
+  let of_error (err : Checker.error) : Diag_core.t =
     match err with
-    | EUnboundVar { range; x } ->
-        Diag.error ~code:"E_UNBOUND_VAR" ~range ("Unbound variable: " ^ x)
-    | EExpectedBool { range } ->
-        Diag.error ~code:"E_EXPECTED_BOOL" ~range
-          "Expected Bool in if-condition"
-    | ETypeMismatch { range; expected; got } ->
-        Diag.error ~code:"E_TYPE_MISMATCH" ~range
-          ("If branches have different types: " ^ Ast.string_of_ty expected
-         ^ " vs " ^ Ast.string_of_ty got)
-    | EExpectedFun { range } ->
-        Diag.error ~code:"E_EXPECTED_FUN" ~range
-          "Expected a function in application"
+    | EUnboundVar { id; x } ->
+        Diag_core.error ~code:"E_UNBOUND_VAR" ~primary:id
+          (Diag_core.Unbound_var { x })
+    | EExpectedBool { id } ->
+        Diag_core.error ~code:"E_EXPECTED_BOOL" ~primary:id
+          Diag_core.Expected_bool
+    | ETypeMismatch { id; expected; got } ->
+        Diag_core.error ~code:"E_TYPE_MISMATCH" ~primary:id
+          (Diag_core.Type_mismatch { expected; got })
+    | EExpectedFun { id } ->
+        Diag_core.error ~code:"E_EXPECTED_FUN" ~primary:id
+          Diag_core.Expected_fun
     | EStackEscape ev ->
         let related =
           ev.binders
-          |> List.map (fun (x, id) ->
-              {
-                Diag.range = Ast_index.range idx id;
-                message = "Stack binding of " ^ x;
-              })
+          |> List.map (fun (x, binder_id) ->
+              Diag_core.Stack_binder { x; binder_id })
         in
-        Diag.error ~code:"E_STACK_ESCAPE"
-          ~range:(Ast_index.range idx ev.export_id)
-          ~related
-          "export requires a stack-closed expressions, but stack-bound \
-           variables are referenced"
+        Diag_core.error ~code:"E_STACK_ESCAPE" ~primary:ev.export_id ~related
+          (Diag_core.Stack_escape { escaping_vars = ev.escaping_vars })
 end
