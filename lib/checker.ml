@@ -10,13 +10,7 @@ module Make (Ast : Ast.S) = struct
   module StringSet = Set.Make (String)
   module StringMap = Map.Make (String)
 
-  type stack_binding = {
-    ty : ty;
-    binder_id : node_id;
-    _binder_range : range;
-    _kw_range : range;
-  }
-
+  type stack_binding = { ty : ty; binder_id : node_id }
   type env = { heap : ty StringMap.t; stack : stack_binding StringMap.t }
 
   let empty_env : env = { heap = StringMap.empty; stack = StringMap.empty }
@@ -92,17 +86,9 @@ module Make (Ast : Ast.S) = struct
         let env' = extend_heap env x t1 in
         let* t2, d2 = inf env' e2 in
         Ok (t2, union_deps d1 d2)
-    | ELetStack { kw_range; x; x_range; e1; e2 } ->
+    | ELetStack { x; e1; e2; _ } ->
         let* t1, d1 = inf env e1 in
-        let env' =
-          extend_stack env x
-            {
-              ty = t1;
-              binder_id = e.id;
-              _binder_range = x_range;
-              _kw_range = kw_range;
-            }
-        in
+        let env' = extend_stack env x { ty = t1; binder_id = e.id } in
         let* t2, d2 = inf env' e2 in
         Ok (t2, union_deps d1 d2)
     | EExport e1 ->
