@@ -19,7 +19,7 @@ type parse_error =
 
 type snapshot = {
   (* source : string; *)
-  (* root : expr; *)
+  root : Ast.expr;
   index : Ast_index.t; (* version : int; *)
 }
 
@@ -50,7 +50,7 @@ let build_snapshot ~(source : string) ~(root : Ast.expr) ~(version : int) :
   let _ = version in
   let index = Ast_index.build root in
   (* { source; root; index; version } *)
-  { index }
+  { root; index }
 
 let from_string ?(version = 0) ?fname (source : string) :
     (t, parse_error) result =
