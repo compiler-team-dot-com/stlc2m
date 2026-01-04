@@ -5,7 +5,7 @@ module type S = sig
   type node_id
 
   val build : expr -> t
-
   val range : t -> node_id -> range
   val parent : t -> node_id -> node_id option
+  val expr : t -> node_id -> expr
 end
