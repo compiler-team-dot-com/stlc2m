@@ -1,14 +1,15 @@
 module Make (Diag : Diag.S) = struct
   module J = Yojson.Safe
+  module JC = Json_common
 
-  let pos_to_json (p : Lexing.position) : J.t =
-    let line = p.pos_lnum in
-    let col = p.pos_cnum - p.pos_bol in
-    `Assoc [ ("line", `Int line); ("col", `Int col) ]
+  module Range : Json_common.Range with type t = Diag.range = struct
+    type t = Diag.range
 
-  let range_to_json (r : Diag.range) : J.t =
-    `Assoc
-      [ ("start", pos_to_json r.start_pos); ("end", pos_to_json r.end_pos) ]
+    let start_pos (r : t) = r.start_pos
+    let end_pos (r : t) = r.end_pos
+  end
+
+  let range_to_json (r : Diag.range) : J.t = JC.range_to_json (module Range) r
 
   let related_to_json (r : Diag.related) : J.t =
     `Assoc [ ("range", range_to_json r.range); ("message", `String r.message) ]
