@@ -5,7 +5,7 @@ module Make
     (Diag_core :
       Diag_core.S with type node_id = Ast.node_id and type ty = Ast.ty) =
 struct
-  type kind = Quickfix | Explain
+  type kind = Action_kind.t
 
   (* A node-id "set" implemented via Ast.IdMap. *)
   module NodeIdSet = struct

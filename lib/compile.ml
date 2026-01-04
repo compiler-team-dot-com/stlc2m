@@ -22,7 +22,7 @@ type parse_error =
 
 type snapshot = {
   (* source : string; *)
-  root : Ast.expr;
+  _root : Ast.expr;
   index : Ast_index.t; (* version : int; *)
 }
 
@@ -53,7 +53,7 @@ let build_snapshot ~(source : string) ~(root : Ast.expr) ~(version : int) :
   let _ = version in
   let index = Ast_index.build root in
   (* { source; root; index; version } *)
-  { root; index }
+  { _root = root; index }
 
 let from_string ?(version = 0) ?fname (source : string) :
     (t, parse_error) result =
@@ -74,7 +74,7 @@ let from_channel ?(version = 0) ?fname (ic : in_channel) :
 let diag_of_error (snap : snapshot) (err : error) : Diag.t =
   err |> Checker_report.of_error |> Diag_render.render snap.index
 
-type action_kind = Quickfix | Explain
+type action_kind = Action_kind.t
 
 type action = {
   id : int;
@@ -99,12 +99,11 @@ let report_of_error (snap : snapshot) (err : error) : Diag.t * action list =
   in
 
   let actions =
-    Actions.propose_actions ~next_id:next ~root:snap.root ~index:snap.index
-      ~diag:diag_core err
+    Actions.propose_actions ~next_id:next ~index:snap.index ~diag:diag_core err
     |> List.map (fun (a : Actions.t) ->
         {
           id = Action_id.to_int a.id;
-          kind = (match a.kind with Quickfix -> Quickfix | Explain -> Explain);
+          kind = a.kind;
           title = a.title;
           targets = a.targets;
           highlights = a.highlights;

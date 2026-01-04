@@ -5,7 +5,7 @@ module Make
     (Action_id : sig
       type t = int
     end) : sig
-  type kind = Quickfix | Explain
+  type kind = Action_kind.t
 
   type t = {
     id : Action_id.t;
@@ -14,13 +14,11 @@ module Make
     targets : Ast.node_id list; (* semantic targets *)
     highlights : Ast.range list; (* derived UI highlighting *)
     rationale : string;
-    apply : unit -> Ast.expr option; (* None for Explain *)
   }
 
   val render :
     next_id:(unit -> Action_id.t) ->
-    root:Ast.expr ->
     index:Ast_index.t ->
-    kind * string * Ast.node_id list * string * (Ast.expr -> Ast.expr option) ->
+    kind * string * Ast.node_id list * string ->
     t
 end

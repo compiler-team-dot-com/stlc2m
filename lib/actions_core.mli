@@ -4,7 +4,7 @@ module Make
       Checker.S with type expr = Ast.expr and type node_id = Ast.node_id)
     (Diag_core :
       Diag_core.S with type node_id = Ast.node_id and type ty = Ast.ty) : sig
-  type kind = Quickfix | Explain
+  type kind = Action_kind.t
 
   type proposal = {
     kind : kind;

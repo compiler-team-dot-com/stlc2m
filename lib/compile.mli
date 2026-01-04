@@ -22,7 +22,7 @@ val from_channel :
 
 val diag_of_error : snapshot -> error -> Diag.t
 
-type action_kind = Quickfix | Explain
+type action_kind = Action_kind.t
 
 type action = {
   id : Action_id.t;

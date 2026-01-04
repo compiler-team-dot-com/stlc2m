@@ -13,19 +13,12 @@ struct
   module Core = Actions_core.Make (Ast) (Checker) (Diag_core)
   module Render = Actions_render.Make (Ast) (Ast_index) (Action_id)
 
-  type kind = Render.kind = Quickfix | Explain
+  type kind = Action_kind.t
   type t = Render.t
 
-  let propose_actions ~next_id ~root ~index ~(diag : Diag_core.t)
+  let propose_actions ~next_id ~index ~(diag : Diag_core.t)
       (err : Checker.error) : t list =
     Core.propose diag err
     |> List.map (fun (p : Core.proposal) ->
-        Render.render ~next_id ~root ~index
-          ( (match p.kind with
-            | Core.Quickfix -> Quickfix
-            | Core.Explain -> Explain),
-            p.title,
-            p.targets,
-            p.rationale,
-            p.apply ))
+        Render.render ~next_id ~index (p.kind, p.title, p.targets, p.rationale))
 end

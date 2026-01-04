@@ -6,7 +6,7 @@ module Make
       type t = int
     end) =
 struct
-  type kind = Quickfix | Explain
+  type kind = Action_kind.t
 
   type t = {
     id : Action_id.t;
@@ -15,22 +15,12 @@ struct
     targets : Ast.node_id list;
     highlights : Ast.range list;
     rationale : string;
-    apply : unit -> Ast.expr option;
   }
 
-  let render ~next_id ~root ~index
-      ((kind, title, targets, rationale, apply_fn) :
-        kind
-        * string
-        * Ast.node_id list
-        * string
-        * (Ast.expr -> Ast.expr option)) : t =
+  let render ~next_id ~index
+      ((kind, title, targets, rationale) :
+        kind * string * Ast.node_id list * string) : t =
     let id = next_id () in
     let highlights = targets |> List.map (Ast_index.range index) in
-    let apply =
-      match kind with
-      | Explain -> fun () -> None
-      | Quickfix -> fun () -> apply_fn root
-    in
-    { id; kind; title; targets; highlights; rationale; apply }
+    { id; kind; title; targets; highlights; rationale }
 end
