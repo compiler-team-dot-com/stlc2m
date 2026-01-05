@@ -1,0 +1,219 @@
+#+title: Server Patch Protocol Design
+#+subtitle: Diagnostics + Actions + Patch Application (Emacs integration)
+#+date: 2026-01-05
+#+options: toc:2
+
+* Overview
+This document captures the current design decisions for how the compiler server proposes actions and returns patches (text edits) to Emacs.
+
+The design separates:
+- *Semantic facts* (what is wrong; node_id anchored)
+- *Rendered diagnostics* (ranges + human text)
+- *Proposed actions* (node_id targets; transform defined by the server)
+- *Wire format* (JSON encoding)
+- *Patch application protocol* (safe, versioned application on editor buffers)
+
+* Architectural Layers
+** Diagnostics
+- =Diag_core=
+  - Structured diagnostic facts; no prose.
+  - Primary anchor is a =node_id=.
+  - May include related =node_id= anchors.
+- =Diag_render=
+  - Produces =Diag.t= (human-facing):
+    - ranges (via =Ast_index.range=)
+    - message strings
+- =Diag_json=
+  - JSON encoding of =Diag.t= for the wire.
+
+** Actions
+- =Actions_core=
+  - Produces action proposals from (at least) the semantic error/diagnostic facts.
+  - Targets are =node_id= (never ranges).
+  - Contains the actual transformation logic as a function:
+    - =apply : Ast.expr -> Ast.expr option=
+- =Actions_render=
+  - Derived metadata only (UI-oriented):
+    - =highlights : range list= computed from node_ids via =Ast_index.range=
+    - titles/rationale text (if desired at this layer)
+  - *Does not* carry =apply=.
+- =Actions_json=
+  - JSON encoding of actions for the wire.
+
+** Shared JSON Encoding Helpers
+- =Json_common=
+  - Shared primitives for JSON encoding, e.g.:
+    - =pos_to_json=
+    - a generic =range_to_json= via a small accessor interface
+  - Used by both =Diag_json= and =Actions_json=.
+
+* Coordinate System for Patches
+The patch/edit coordinate system is defined as follows:
+
+- Position = (line, col)
+  - =line= is *1-based*
+  - =col= is *0-based*
+  - =col= counts *characters in the line*, not display columns
+    - Tabs count as one character for positioning purposes.
+- Ranges are *half-open*: [start, end)
+- These rules apply consistently across diagnostics, actions highlights, and patches.
+
+* Patch Format (Text Edits)
+The server returns patches as *text edits*, not AST edits.
+
+** Edit representation
+Each edit is a replacement over a range:
+
+- =range: { start:{line,col}, end:{line,col} }=
+- =replacement: string=
+
+** Patch representation
+A patch is either:
+- =edits: edit list= (preferred)
+or
+- =replace_all: string= (fallback)
+
+Rule: exactly one of (=edits=, =replace_all=) is present.
+
+* Multi-edit Semantics: Ordering and Overlap Rules
+To make patches deterministic and safe:
+
+** Interpretation basis
+All edit ranges are interpreted against the *original buffer text* that the patch was computed for.
+
+** Overlap constraints
+- Server guarantees edits are *non-overlapping* in the original coordinate space.
+- With half-open intervals, touching edits are allowed:
+  - If edit1 ends at position P and edit2 starts at P, they do not overlap.
+
+** Application order
+- The client applies edits in *descending* order by start position:
+  - Sort by (start.line, start.col) descending.
+- With non-overlap + descending order, coordinates remain valid during application.
+
+** Overlapping edits
+If the server would otherwise generate overlapping edits:
+- The server must normalize (merge) them before returning, or
+- Fall back to =replace_all=.
+
+Client behavior on overlap:
+- Client may reject if overlaps appear (defensive), but the server contract is “no overlaps.”
+
+* Staleness and Validation
+Actions and patches must not be applied to the wrong text.
+
+** Validation tokens
+Each check/apply flow carries:
+- =version= (monotonic integer managed by the client), and
+- =content_hash= (e.g. SHA-256) of the exact buffer text.
+
+Recommendation: use *both*.
+- Version is convenient for clients.
+- Hash is robust for safety and debugging.
+
+** Server validation rule
+On =apply_action=, the server validates that:
+- request.version matches the action’s recorded version, and/or
+- request.content_hash matches the action’s recorded hash.
+
+If validation fails:
+- return =ok:false= with:
+  - =code: "E_STALE_ACTION"=
+  - include expected vs got (version/hash) for debugging
+- do not attempt best-effort application by default.
+
+* Formatter Interaction
+Two models exist:
+
+** Model 1 (initial): combined semantic rewrite + formatting
+- Server performs:
+  1) apply semantic AST rewrite
+  2) pretty-print / format as desired
+  3) compute patch old_text -> new_text
+- Returned patch includes formatting changes implicitly.
+
+Pros:
+- simplest for Emacs and protocol
+Cons:
+- patches can be larger due to formatting
+
+** Model 2 (later): two-phase formatting
+- Server may return semantic patch first, and offer a separate formatting action.
+
+Initial choice: *Model 1*.
+
+* Action Identity and Registry
+Actions are proposed and applied in separate steps.
+
+** Action IDs
+- Keep =Action_id= distinct from =node_id=.
+- Actions returned to Emacs contain:
+  - =id=, =kind=, =title=, =targets(node_id list)=, =highlights(range list)=, =rationale=
+- Returned actions do not carry closures on the wire.
+
+** Server-side action registry
+When responding to =check=:
+- The server registers each proposed action in an in-memory registry keyed by =Action_id=.
+- Registry entry stores:
+  - the =apply= function (closure) from =Actions_core=
+  - the version/hash the action was computed against
+  - targets, and any other context needed
+
+* Protocol Sketch
+** check
+Request:
+- =method: "check"=
+- =text= (buffer contents)
+- =version=
+- =content_hash=
+
+Response:
+- =ok: true=
+- =diagnostics: Diag.t list= (rendered)
+- =actions: action list= (metadata, no closures)
+- echo =version/hash= as needed
+
+** apply_action
+Request:
+- =method: "apply_action"=
+- =action_id=
+- =text= (current buffer contents)
+- =version=
+- =content_hash=
+
+Server steps:
+1) lookup action_id in registry
+2) validate version/hash
+3) apply rewrite to AST (or to stored snapshot, depending on implementation choice)
+4) pretty-print/format new text
+5) compute patch from old text to new text
+6) respond with patch
+
+Response on success:
+- =ok: true=
+- patch: either =edits= or =replace_all=
+- =new_hash= (and optionally =new_version=)
+- optionally updated diagnostics/actions (later extension)
+
+Response on stale:
+- =ok: false=
+- =error.code = "E_STALE_ACTION"=
+- include expected/got tokens
+
+* Implementation Plan (Incremental)
+1) Implement server-side action registry.
+2) Implement =apply_action= endpoint.
+3) Initially return =replace_all= (safe baseline).
+4) Upgrade patch synthesis to multi-edit, enforcing:
+   - non-overlap
+   - descending order
+5) Optionally add defensive validation on the client (reject overlaps, validate hash).
+
+* Invariants Summary
+- Diagnostics and actions are anchored to =node_id= internally.
+- Ranges are derived using =Ast_index= at render time.
+- Wire format is JSON; encoding logic lives outside =Server=.
+- Patch coordinates are (line 1-based, col 0-based, character count).
+- Patch edits are non-overlapping, half-open, and applied descending.
+- Apply is guarded by version+hash; stale actions are rejected.
+- =replace_all= is always available as a fallback.
