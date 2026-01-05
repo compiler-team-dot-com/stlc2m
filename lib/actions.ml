@@ -15,10 +15,14 @@ struct
 
   type kind = Action_kind.t
   type t = Render.t
+  type apply_fn = Ast.expr -> Ast.expr option
 
   let propose_actions ~next_id ~index ~(diag : Diag_core.t)
-      (err : Checker.error) : t list =
+      (err : Checker.error) : (t * apply_fn) list =
     Core.propose diag err
     |> List.map (fun (p : Core.proposal) ->
-        Render.render ~next_id ~index (p.kind, p.title, p.targets, p.rationale))
+        let rendered =
+          Render.render ~next_id ~index (p.kind, p.title, p.targets, p.rationale)
+        in
+        (rendered, p.apply))
 end

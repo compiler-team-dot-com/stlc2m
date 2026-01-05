@@ -35,4 +35,9 @@ type action = {
   rationale : string;
 }
 
-val report_of_error : snapshot -> error -> Diag.t * action list
+val snapshot_root : snapshot -> Ast.expr
+
+type action_impl = Ast.expr -> Ast.expr option
+
+val report_of_error :
+  snapshot -> error -> Diag.t * action list * (Action_id.t * action_impl) list

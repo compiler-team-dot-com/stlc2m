@@ -22,7 +22,7 @@ type parse_error =
 
 type snapshot = {
   (* source : string; *)
-  _root : Ast.expr;
+  root : Ast.expr;
   index : Ast_index.t; (* version : int; *)
 }
 
@@ -53,7 +53,7 @@ let build_snapshot ~(source : string) ~(root : Ast.expr) ~(version : int) :
   let _ = version in
   let index = Ast_index.build root in
   (* { source; root; index; version } *)
-  { _root = root; index }
+  { root; index }
 
 let from_string ?(version = 0) ?fname (source : string) :
     (t, parse_error) result =
@@ -85,7 +85,12 @@ type action = {
   rationale : string;
 }
 
-let report_of_error (snap : snapshot) (err : error) : Diag.t * action list =
+let snapshot_root { root; _ } = root
+
+type action_impl = Ast.expr -> Ast.expr option
+
+let report_of_error (snap : snapshot) (err : error) :
+    Diag.t * action list * (Action_id.t * action_impl) list =
   let diag_core = Checker_report.of_error err in
   let diag = Diag_render.render snap.index diag_core in
 
@@ -98,9 +103,13 @@ let report_of_error (snap : snapshot) (err : error) : Diag.t * action list =
       !r
   in
 
-  let actions =
+  let rendered_with_impl =
     Actions.propose_actions ~next_id:next ~index:snap.index ~diag:diag_core err
-    |> List.map (fun (a : Actions.t) ->
+  in
+
+  let actions =
+    rendered_with_impl
+    |> List.map (fun ((a, _impl) : Actions.t * action_impl) ->
         {
           id = Action_id.to_int a.id;
           kind = a.kind;
@@ -110,4 +119,10 @@ let report_of_error (snap : snapshot) (err : error) : Diag.t * action list =
           rationale = a.rationale;
         })
   in
-  (diag, actions)
+
+  let impls =
+    rendered_with_impl
+    |> List.map (fun ((a, impl) : Actions.t * action_impl) -> (a.id, impl))
+  in
+
+  (diag, actions, impls)
