@@ -161,6 +161,8 @@ let line_starts (old_lines : string array) : int array =
 let pos_of_offset ~(line_starts : int array) ~(offset : int) : int * int =
   (* line is 1-based, col is 0-based *)
   let n = Array.length line_starts - 1 in
+  if n = 0 then (1, offset)
+  else
   (* binary search: largest i s.t. line_starts.(i) <= offset *)
   let rec bs lo hi =
     if lo + 1 >= hi then lo
