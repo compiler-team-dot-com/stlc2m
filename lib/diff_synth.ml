@@ -1,7 +1,7 @@
 type hunk = { a_start : int; a_len : int; b_start : int; b_len : int }
 (* Interpretation:
-     Old text replaces a[a_start .. a_start+a_len]
-     With b[b_start .. b_start+b_len]. *)
+     Old text replaces a[a_start .. a_start+a_len-1]
+     With b[b_start .. b_start+b_len-1]. *)
 
 let split_lines_keep_ends (s : string) : string array =
   (* Keep trailing '\n' with each line so replacements reconstitute cleanly. *)
@@ -163,18 +163,18 @@ let pos_of_offset ~(line_starts : int array) ~(offset : int) : int * int =
   let n = Array.length line_starts - 1 in
   if n = 0 then (1, offset)
   else
-  (* binary search: largest i s.t. line_starts.(i) <= offset *)
-  let rec bs lo hi =
-    if lo + 1 >= hi then lo
-    else
-      let mid = (lo + hi) / 2 in
-      if line_starts.(mid) <= offset then bs mid hi else bs lo mid
-  in
-  let i = bs 0 (n + 1) in
-  let line = max 1 i in
-  let bol = line_starts.(i) in
-  let col = offset - bol in
-  (line, col)
+    (* binary search: largest i s.t. line_starts.(i) <= offset *)
+    let rec bs lo hi =
+      if lo + 1 >= hi then lo
+      else
+        let mid = (lo + hi) / 2 in
+        if line_starts.(mid) <= offset then bs mid hi else bs lo mid
+    in
+    let i = bs 0 (n + 1) in
+    let line = max 1 i in
+    let bol = line_starts.(i) in
+    let col = offset - bol in
+    (line, col)
 
 let edits ~(old_text : string) ~(new_text : string) : Text_edit.t list option =
   let a = split_lines_keep_ends old_text in
