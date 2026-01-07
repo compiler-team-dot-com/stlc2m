@@ -22,6 +22,7 @@ let split_lines_keep_ends (s : string) : string array =
 (* Myers diff on arrays of strings. Returns a list of hunks. *)
 (* Myers diff on arrays of strings. Returns a list of hunks. *)
 let myers_hunks (a : string array) (b : string array) : hunk list =
+  (* TODO(perf): consider iterative snake to avoid recursion depth on large equal runs. *)
   let n = Array.length a in
   let m = Array.length b in
   let maxd = n + m in
@@ -34,7 +35,8 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
   v.(offset) <- 0;
   v.(offset + 1) <- 0;
 
-  (* trace.(d) stores v AFTER finishing all k at edit distance d. *)
+  (* trace.(d) stores v AFTER finishing all k at edit distance d.
+     TODO(perf): store only the active diagonal slice to reduce memory. *)
   let trace = Array.make (maxd + 1) [||] in
 
   let rec advance_snake x y =
@@ -45,6 +47,7 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
 
   let rec forward d =
     (* compute v for this d based on values from previous d *)
+    (* TODO(perf): keep two arrays and swap instead of copying each d. *)
     let v_prev = Array.copy v in
 
     (* k runs in steps of 2: -d, -d+2, ..., d *)
