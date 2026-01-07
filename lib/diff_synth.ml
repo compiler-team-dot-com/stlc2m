@@ -132,13 +132,15 @@ let coalesce (hs : hunk list) : hunk list =
         | h0 :: acc_tl ->
             let a_end0 = h0.a_start + h0.a_len in
             let b_end0 = h0.b_start + h0.b_len in
-            if h.a_start = a_end0 && h.b_start = b_end0 then
+            if h.a_start <= a_end0 && h.b_start <= b_end0 then
+              let a_end = max a_end0 (h.a_start + h.a_len) in
+              let b_end = max b_end0 (h.b_start + h.b_len) in
               let h' =
                 {
                   a_start = h0.a_start;
-                  a_len = h0.a_len + h.a_len;
+                  a_len = a_end - h0.a_start;
                   b_start = h0.b_start;
-                  b_len = h0.b_len + h.b_len;
+                  b_len = b_end - h0.b_start;
                 }
               in
               go (h' :: acc_tl) tl
