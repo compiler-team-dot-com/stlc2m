@@ -92,12 +92,13 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
       let k = x - y in
       let ki = k + offset in
 
-      (* Determine which predecessor diagonal we came from. *)
+      (* Choose predecessor diagonal: prefer the move that yields the larger x. *)
       let prev_k =
         if k = -d || (k <> d && v_prev.(ki - 1) < v_prev.(ki + 1)) then k + 1
         else k - 1
       in
 
+      (* Previous endpoint before the last edit step. *)
       let prev_x = v_prev.(prev_k + offset) in
       let prev_y = prev_x - prev_k in
 
