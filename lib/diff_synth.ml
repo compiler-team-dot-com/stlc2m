@@ -37,8 +37,9 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
   (* trace.(d) stores v AFTER finishing all k at edit distance d. *)
   let trace = Array.make (maxd + 1) [||] in
 
-  let rec snake x y =
-    if x < n && y < m && String.equal a.(x) b.(y) then snake (x + 1) (y + 1)
+  let rec advance_snake x y =
+    if x < n && y < m && String.equal a.(x) b.(y) then
+      advance_snake (x + 1) (y + 1)
     else (x, y)
   in
 
@@ -68,7 +69,7 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
       let y = x - kk in
 
       (* Extend along snake of equal lines. *)
-      let x', _y' = snake x y in
+      let x', _y' = advance_snake x y in
       v.(ki) <- x';
 
       k := kk + 2
@@ -101,12 +102,12 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
       let prev_y = prev_x - prev_k in
 
       (* Undo snake: move back over equal lines. *)
-      let rec unsnake x y =
+      let rec rewind_snake x y =
         if x > prev_x && y > prev_y && String.equal a.(x - 1) b.(y - 1) then
-          unsnake (x - 1) (y - 1)
+          rewind_snake (x - 1) (y - 1)
         else (x, y)
       in
-      let x0, y0 = unsnake x y in
+      let x0, y0 = rewind_snake x y in
 
       (* The edit step is from (prev_x, prev_y) to (x0, y0). *)
       let h =
