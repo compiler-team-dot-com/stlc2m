@@ -121,6 +121,7 @@ let myers_hunks (a : string array) (b : string array) : hunk list =
   in
 
   backtrack d_final n m []
+  |> List.filter (fun h -> h.a_len <> 0 || h.b_len <> 0)
 
 (* Convert hunks to line-span replacements. Coalesce adjacent hunks. *)
 let coalesce (hs : hunk list) : hunk list =
