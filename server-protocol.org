@@ -151,11 +151,17 @@ Actions are proposed and applied in separate steps.
   - =id=, =kind=, =title=, =targets(node_id list)=, =highlights(range list)=, =rationale=
 - Returned actions do not carry closures on the wire.
 
-** Server-side action registry
+** Snapshot IDs
+- Each check assigns a =snapshot_id= to the AST snapshot used to derive actions.
+- The =snapshot_id= is returned alongside actions and sent back on =apply_action=.
+
+** Server-side registries
 When responding to =check=:
-- The server registers each proposed action in an in-memory registry keyed by =Action_id=.
-- Registry entry stores:
+- The server registers the snapshot in a snapshot registry keyed by =snapshot_id=.
+- The server registers each proposed action in an action registry keyed by =Action_id=.
+- Action registry entry stores:
   - the =apply= function (closure) from =Actions_core=
+  - =snapshot_id= for lookup
   - the version/hash the action was computed against
   - targets, and any other context needed
 
@@ -171,12 +177,14 @@ Response:
 - =ok: true=
 - =diagnostics: Diag.t list= (rendered)
 - =actions: action list= (metadata, no closures)
+- =snapshot_id=
 - echo =version/hash= as needed
 
 ** apply_action
 Request:
 - =method: "apply_action"=
 - =action_id=
+- =snapshot_id=
 - =text= (current buffer contents)
 - =version=
 - =content_hash=
@@ -184,10 +192,11 @@ Request:
 Server steps:
 1) lookup action_id in registry
 2) validate version/hash
-3) apply rewrite to AST (or to stored snapshot, depending on implementation choice)
-4) pretty-print/format new text
-5) compute patch from old text to new text
-6) respond with patch
+3) load snapshot via snapshot_id
+4) apply rewrite to AST
+5) pretty-print/format new text
+6) compute patch from old text to new text
+7) respond with patch
 
 Response on success:
 - =ok: true=

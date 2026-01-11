@@ -3,6 +3,7 @@ module Make (Ast : Ast.S) = struct
     apply : Ast.expr -> Ast.expr option;
     version : int option;
     content_hash : string option;
+    snapshot_id : Snapshot_id.t;
   }
 
   type t = (Action_id.t, entry) Hashtbl.t

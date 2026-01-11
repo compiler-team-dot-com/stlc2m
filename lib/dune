@@ -20,8 +20,9 @@
  	  ast_index_intf ast_index diag_intf diag checker_intf checker
 	  parser lexer checker_report_intf checker_report
 	  diag_core_intf diag_core diag_render diag_json ast_index_util
-	  actions action_id action_registry actions_core actions_render json_common
-	  actions_json action_kind pretty text_edit diff_synth)
+	  actions action_id action_registry snapshot_id snapshot_registry
+	  actions_core actions_render json_common actions_json action_kind pretty
+	  text_edit diff_synth)
  (modules_without_implementation parse_env_intf ast_index_intf checker_intf
  				 diag_intf checker_report_intf diag_core_intf)
  (libraries core_unix menhirLib yojson)
