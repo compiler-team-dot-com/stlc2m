@@ -2,16 +2,11 @@ module Ast = Compile.Ast
 module Pretty = Pretty.Make (Ast)
 module Diag = Compile.Diag
 module Diag_json = Diag_json.Make (Diag)
+module Action_registry = Action_registry.Make (Ast)
 module J = Yojson.Safe
 module JU = Yojson.Safe.Util
 
-type action_entry = {
-  apply : Ast.expr -> Ast.expr option;
-  version : int option;
-  content_hash : string option;
-}
-
-let registry : (Action_id.t, action_entry) Hashtbl.t = Hashtbl.create 64
+let registry = Action_registry.create ()
 let last_root : Ast.expr option ref = ref None
 
 let get_opt_int (json : J.t) (field : string) : int option =
@@ -54,7 +49,7 @@ let mk_ok_replace_all ~id ~text : J.t =
 (* Parse+check from raw source text, registering actions in server state. *)
 let check_text ~(text : string) ~(version : int option)
     ~(content_hash : string option) : Diag.t list * Compile.action list =
-  Hashtbl.reset registry;
+  Action_registry.clear registry;
   last_root := None;
 
   match Compile.from_string ~version:0 ~fname:"<buffer>" text with
@@ -68,11 +63,11 @@ let check_text ~(text : string) ~(version : int option)
 
       impls
       |> List.iter (fun (id, apply) ->
-          Hashtbl.replace registry id { apply; version; content_hash });
+          Action_registry.add registry id { apply; version; content_hash });
 
       ([ diag ], actions)
 
-let validate_tokens ~(entry : action_entry) ~(version : int option)
+let validate_tokens ~(entry : Action_registry.entry) ~(version : int option)
     ~(content_hash : string option) : (unit, string) result =
   (* If either side omitted tokens, we allow it (incremental rollout).
      If both have a value, require equality. *)
@@ -94,7 +89,7 @@ let validate_tokens ~(entry : action_entry) ~(version : int option)
 
 let apply_action ~(action_id : Action_id.t) ~(version : int option)
     ~(content_hash : string option) : (string, string * string) result =
-  match Hashtbl.find_opt registry action_id with
+  match Action_registry.find_opt registry action_id with
   | None -> Error ("E_UNKNOWN_ACTION", Printf.sprintf "Action id: %d" action_id)
   | Some entry -> (
       match validate_tokens ~entry ~version ~content_hash with
@@ -108,7 +103,7 @@ let apply_action ~(action_id : Action_id.t) ~(version : int option)
                   Error ("E_ACTION_NOT_APPLICABLE", "Action is not applicable")
               | Some new_root ->
                   (* After applying, invalidate old registry; the world changed. *)
-                  Hashtbl.reset registry;
+                  Action_registry.clear registry;
                   last_root := Some new_root;
                   Ok (Pretty.pp_expr new_root))))
 
