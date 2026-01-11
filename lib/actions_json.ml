@@ -20,7 +20,7 @@ let action_kind_to_json (k : Compile.action_kind) : J.t =
 let action_to_json (a : Compile.action) : J.t =
   `Assoc
     [
-      ("id", `Int a.id);
+      ("id", `Int (Action_id.to_int a.id));
       ("kind", action_kind_to_json a.kind);
       ("title", `String a.title);
       ("targets", `List (List.map node_id_to_json a.targets));

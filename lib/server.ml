@@ -21,6 +21,23 @@ let get_opt_int (json : J.t) (field : string) : int option =
 let get_opt_string (json : J.t) (field : string) : string option =
   match JU.member field json with `Null -> None | v -> Some (JU.to_string v)
 
+let get_opt_snapshot_id (json : J.t) (field : string) :
+    (Snapshot_id.t option, string) result =
+  match get_opt_int json field with
+  | None -> Ok None
+  | Some i -> (
+      match Snapshot_id.of_int i with
+      | None -> Error ("Bad " ^ field ^ ": negative id")
+      | Some sid -> Ok (Some sid))
+
+let get_action_id (json : J.t) (field : string) : (Action_id.t, string) result =
+  match JU.member field json with
+  | `Null -> Error ("Missing " ^ field)
+  | v -> (
+      match Action_id.of_int (JU.to_int v) with
+      | None -> Error ("Bad " ^ field ^ ": negative id")
+      | Some aid -> Ok aid)
+
 let mk_error ~id ~code ~message : J.t =
   `Assoc
     [
@@ -71,7 +88,7 @@ let check_text ~(text : string) ~(version : int option)
   | Ok { snapshot = Some snap; result = Some (Error err) } ->
       let diag, actions, impls = Compile.report_of_error snap err in
       incr next_snapshot_id;
-      let snapshot_id = !next_snapshot_id in
+      let snapshot_id = Snapshot_id.of_int_exn !next_snapshot_id in
       Snapshot_registry.add snapshots snapshot_id snap;
 
       impls
@@ -94,7 +111,9 @@ let validate_tokens ~(entry : Action_registry.entry)
     | _ -> Ok ()
   in
   match
-    check_opt "snapshot_id" string_of_int (Some entry.snapshot_id) snapshot_id
+    check_opt "snapshot_id"
+      (fun s -> string_of_int (Snapshot_id.to_int s))
+      (Some entry.snapshot_id) snapshot_id
   with
   | Error _ as e -> e
   | Ok () -> (
@@ -113,7 +132,10 @@ let apply_action ~(action_id : Action_id.t) ~(version : int option)
     ~(content_hash : string option) ~(snapshot_id : Snapshot_id.t option) :
     (string, string * string) result =
   match Action_registry.find_opt registry action_id with
-  | None -> Error ("E_UNKNOWN_ACTION", Printf.sprintf "Action id: %d" action_id)
+  | None ->
+      Error
+        ( "E_UNKNOWN_ACTION",
+          Printf.sprintf "Action id: %d" (Action_id.to_int action_id) )
   | Some entry -> (
       match validate_tokens ~entry ~snapshot_id ~version ~content_hash with
       | Error msg -> Error ("E_STALE_ACTION", msg)
@@ -145,13 +167,20 @@ let handle_request (json : J.t) : J.t =
         in
         mk_ok_check ~id ~diags ~actions ~snapshot_id ~version ~content_hash
     | "apply_action" -> (
-        let action_id = JU.member "action_id" json |> JU.to_int in
-        let snapshot_id = get_opt_int json "snapshot_id" in
-        let version = get_opt_int json "version" in
-        let content_hash = get_opt_string json "content_hash" in
-        match apply_action ~action_id ~snapshot_id ~version ~content_hash with
-        | Ok new_text -> mk_ok_replace_all ~id ~text:new_text
-        | Error (code, message) -> mk_error ~id ~code ~message)
+        match
+          ( get_action_id json "action_id",
+            get_opt_snapshot_id json "snapshot_id" )
+        with
+        | Error msg, _ | _, Error msg ->
+            mk_error ~id ~code:"E_PROTOCOL" ~message:msg
+        | Ok action_id, Ok snapshot_id -> (
+            let version = get_opt_int json "version" in
+            let content_hash = get_opt_string json "content_hash" in
+            match
+              apply_action ~action_id ~snapshot_id ~version ~content_hash
+            with
+            | Ok new_text -> mk_ok_replace_all ~id ~text:new_text
+            | Error (code, message) -> mk_error ~id ~code ~message))
     | _ ->
         mk_error ~id ~code:"E_PROTOCOL" ~message:("Unknown method: " ^ method_)
   with

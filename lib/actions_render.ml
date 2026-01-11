@@ -3,7 +3,7 @@ module Make
     (Ast_index :
       Ast_index.S with type range = Ast.Range.t and type node_id = Ast.node_id)
     (Action_id : sig
-      type t = int
+      type t
     end) =
 struct
   type kind = Action_kind.t

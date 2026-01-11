@@ -77,7 +77,7 @@ let diag_of_error (snap : snapshot) (err : error) : Diag.t =
 type action_kind = Action_kind.t
 
 type action = {
-  id : int;
+  id : Action_id.t;
   kind : action_kind;
   title : string;
   targets : Ast.node_id list;
@@ -100,7 +100,7 @@ let report_of_error (snap : snapshot) (err : error) :
     let r = ref 0 in
     fun () ->
       incr r;
-      !r
+      Action_id.of_int_exn !r
   in
 
   let rendered_with_impl =
@@ -111,7 +111,7 @@ let report_of_error (snap : snapshot) (err : error) :
     rendered_with_impl
     |> List.map (fun ((a, _impl) : Actions.t * action_impl) ->
         {
-          id = Action_id.to_int a.id;
+          id = a.id;
           kind = a.kind;
           title = a.title;
           targets = a.targets;
