@@ -36,3 +36,5 @@ setup.log
 _opam/
 
 .vscode/
+all-ocaml-sources.sh
+all-ocaml-sources.txt
