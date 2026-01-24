@@ -185,7 +185,7 @@ Request:
 - =method: "apply_action"=
 - =action_id=
 - =snapshot_id=
-- =text= (current buffer contents)
+- =text= (current buffer contents; required for =edits=, otherwise server returns =replace_all=)
 - =version=
 - =content_hash=
 
@@ -195,28 +195,18 @@ Server steps:
 3) load snapshot via snapshot_id
 4) apply rewrite to AST
 5) pretty-print/format new text
-6) compute patch from old text to new text
-7) respond with patch
+6) compute patch from old text to new text (old text comes from request =text=)
+7) respond with patch (=edits= when possible, else =replace_all=)
 
 Response on success:
 - =ok: true=
 - patch: either =edits= or =replace_all=
-- =new_hash= (and optionally =new_version=)
 - optionally updated diagnostics/actions (later extension)
 
 Response on stale:
 - =ok: false=
 - =error.code = "E_STALE_ACTION"=
 - include expected/got tokens
-
-* Implementation Plan (Incremental)
-1) Implement server-side action registry.
-2) Implement =apply_action= endpoint.
-3) Initially return =replace_all= (safe baseline).
-4) Upgrade patch synthesis to multi-edit, enforcing:
-   - non-overlap
-   - descending order
-5) Optionally add defensive validation on the client (reject overlaps, validate hash).
 
 * Invariants Summary
 - Diagnostics and actions are anchored to =node_id= internally.
