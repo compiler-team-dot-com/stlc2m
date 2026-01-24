@@ -1,7 +1,5 @@
 #+title: Server Patch Protocol Design
 #+subtitle: Diagnostics + Actions + Patch Application (Emacs integration)
-#+date: 2026-01-05
-#+options: toc:2
 
 * Overview
 This document captures the current design decisions for how the compiler server proposes actions and returns patches (text edits) to Emacs.
