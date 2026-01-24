@@ -18,6 +18,8 @@
  (name stlc2m)
  (inline_tests)
  (modules
+  int_id_intf
+  int_id
   parse_env_intf
   parse_env
   tokens
@@ -54,6 +56,7 @@
   text_edit
   diff_synth)
  (modules_without_implementation
+  int_id_intf
   parse_env_intf
   ast_index_intf
   checker_intf
