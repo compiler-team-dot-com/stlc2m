@@ -73,6 +73,22 @@ let mk_ok_check ~id ~diags ~actions ~(snapshot_id : Snapshot_id.t option)
 let mk_ok_replace_all ~id ~text : J.t =
   `Assoc [ ("id", id); ("ok", `Bool true); ("replace_all", `String text) ]
 
+let mk_ok_edits ~id ~(edits : Text_edit.t list) : J.t =
+  `Assoc
+    [
+      ("id", id);
+      ("ok", `Bool true);
+      ("edits", `List (List.map Text_edit.to_json edits));
+    ]
+
+let mk_ok_patch ~id ~(old_text : string option) ~(new_text : string) : J.t =
+  match old_text with
+  | None -> mk_ok_replace_all ~id ~text:new_text
+  | Some old_text -> (
+      match Diff_synth.edits ~old_text ~new_text with
+      | Some edits -> mk_ok_edits ~id ~edits
+      | None -> mk_ok_replace_all ~id ~text:new_text)
+
 (* Parse+check from raw source text, registering actions in server state. *)
 let check_text ~(text : string) ~(version : int option)
     ~(content_hash : string option) :
@@ -176,10 +192,11 @@ let handle_request (json : J.t) : J.t =
         | Ok action_id, Ok snapshot_id -> (
             let version = get_opt_int json "version" in
             let content_hash = get_opt_string json "content_hash" in
+            let old_text = get_opt_string json "text" in
             match
               apply_action ~action_id ~snapshot_id ~version ~content_hash
             with
-            | Ok new_text -> mk_ok_replace_all ~id ~text:new_text
+            | Ok new_text -> mk_ok_patch ~id ~old_text ~new_text
             | Error (code, message) -> mk_error ~id ~code ~message))
     | _ ->
         mk_error ~id ~code:"E_PROTOCOL" ~message:("Unknown method: " ^ method_)
