@@ -99,8 +99,19 @@ let check_text ~(text : string) ~(version : int option)
   match Compile.from_string ~version:0 ~fname:"<buffer>" text with
   | Error _parse_err -> ([], [], None)
   | Ok { snapshot = _; result = None } -> ([], [], None)
-  | Ok { snapshot = _; result = Some (Ok _ok) } -> ([], [], None)
-  | Ok { snapshot = None; result = Some (Error _err) } -> ([], [], None)
+  | Ok { snapshot = None; result = Some _ } -> ([], [], None)
+  | Ok { snapshot = Some snap; result = Some (Ok _ok) } ->
+      let actions, impls = Compile.report_ok snap in
+      incr next_snapshot_id;
+      let snapshot_id = Snapshot_id.of_int_exn !next_snapshot_id in
+      Snapshot_registry.add snapshots snapshot_id snap;
+
+      impls
+      |> List.iter (fun (id, apply) ->
+          Action_registry.add registry id
+            { apply; version; content_hash; snapshot_id });
+
+      ([], actions, Some snapshot_id)
   | Ok { snapshot = Some snap; result = Some (Error err) } ->
       let diag, actions, impls = Compile.report_of_error snap err in
       incr next_snapshot_id;

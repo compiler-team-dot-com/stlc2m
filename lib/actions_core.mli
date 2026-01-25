@@ -15,4 +15,5 @@ module Make
   }
 
   val propose : Diag_core.t -> Checker.error -> proposal list
+  val propose_global : root:Ast.expr -> proposal list
 end

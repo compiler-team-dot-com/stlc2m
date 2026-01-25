@@ -89,24 +89,15 @@ let snapshot_root { root; _ } = root
 
 type action_impl = Ast.expr -> Ast.expr option
 
-let report_of_error (snap : snapshot) (err : error) :
-    Diag.t * action list * (Action_id.t * action_impl) list =
-  let diag_core = Checker_report.of_error err in
-  let diag = Diag_render.render snap.index diag_core in
+let mk_next_action_id () : unit -> Action_id.t =
+  let r = ref 0 in
+  fun () ->
+    incr r;
+    Action_id.of_int_exn !r
 
-  (* Fresh action ids for this response only. Later you can replace with a stateful
-     registry (server-managed) keyed by a stable Action_id.t. *)
-  let next =
-    let r = ref 0 in
-    fun () ->
-      incr r;
-      Action_id.of_int_exn !r
-  in
-
-  let rendered_with_impl =
-    Actions.propose_actions ~next_id:next ~index:snap.index ~diag:diag_core err
-  in
-
+let split_actions_and_impls
+    (rendered_with_impl : (Actions.t * action_impl) list) :
+    action list * (Action_id.t * action_impl) list =
   let actions =
     rendered_with_impl
     |> List.map (fun ((a, _impl) : Actions.t * action_impl) ->
@@ -119,10 +110,36 @@ let report_of_error (snap : snapshot) (err : error) :
           rationale = a.rationale;
         })
   in
-
   let impls =
     rendered_with_impl
     |> List.map (fun ((a, impl) : Actions.t * action_impl) -> (a.id, impl))
   in
+  (actions, impls)
 
+let report_of_error (snap : snapshot) (err : error) :
+    Diag.t * action list * (Action_id.t * action_impl) list =
+  let diag_core = Checker_report.of_error err in
+  let diag = Diag_render.render snap.index diag_core in
+
+  let next = mk_next_action_id () in
+
+  let rendered_global =
+    Actions.propose_global_actions ~next_id:next ~index:snap.index
+      ~root:(snapshot_root snap)
+  in
+  let rendered_error =
+    Actions.propose_actions ~next_id:next ~index:snap.index ~diag:diag_core err
+  in
+  let rendered_with_impl = rendered_global @ rendered_error in
+
+  let actions, impls = split_actions_and_impls rendered_with_impl in
   (diag, actions, impls)
+
+let report_ok (snap : snapshot) : action list * (Action_id.t * action_impl) list
+    =
+  let next = mk_next_action_id () in
+  let rendered_global =
+    Actions.propose_global_actions ~next_id:next ~index:snap.index
+      ~root:(snapshot_root snap)
+  in
+  split_actions_and_impls rendered_global

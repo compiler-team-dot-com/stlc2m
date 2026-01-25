@@ -15,7 +15,10 @@ let node_id_to_json (id : Ast.node_id) : J.t =
   `String (Ast.string_of_node_id id)
 
 let action_kind_to_json (k : Compile.action_kind) : J.t =
-  match k with Quickfix -> `String "quickfix" | Explain -> `String "explain"
+  match k with
+  | Quickfix -> `String "quickfix"
+  | Explain -> `String "explain"
+  | Format -> `String "format"
 
 let action_to_json (a : Compile.action) : J.t =
   `Assoc

@@ -87,4 +87,16 @@ struct
         in
         [ quickfix_letstack_to_let; explain ]
     | _ -> []
+
+  let propose_global ~(root : Ast.expr) : proposal list =
+    [
+      {
+        kind = Format;
+        title = "Format document";
+        targets = [ root.id ];
+        rationale =
+          "Normalize whitespace and layout using the compiler formatter.";
+        apply = (fun root -> Some root);
+      };
+    ]
 end

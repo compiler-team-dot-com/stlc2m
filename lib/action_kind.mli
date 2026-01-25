@@ -1,1 +1,1 @@
-type t = Quickfix | Explain
+type t = Quickfix | Explain | Format

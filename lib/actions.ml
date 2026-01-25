@@ -17,6 +17,15 @@ struct
   type t = Render.t
   type apply_fn = Ast.expr -> Ast.expr option
 
+  let propose_global_actions ~next_id ~index ~(root : Ast.expr) :
+      (t * apply_fn) list =
+    Core.propose_global ~root
+    |> List.map (fun (p : Core.proposal) ->
+        let rendered =
+          Render.render ~next_id ~index (p.kind, p.title, p.targets, p.rationale)
+        in
+        (rendered, p.apply))
+
   let propose_actions ~next_id ~index ~(diag : Diag_core.t)
       (err : Checker.error) : (t * apply_fn) list =
     Core.propose diag err
