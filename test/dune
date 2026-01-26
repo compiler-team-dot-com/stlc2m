@@ -1,3 +1,13 @@
+(executable
+ (name format_harness)
+ (libraries stlc2m))
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files pretty_cases/*.lang))
+ (action (run %{exe:format_harness.exe} %{deps})))
+
 (rule
  (alias runtest)
  (deps %{bin:stlc2m} ok_closed_export.lang)

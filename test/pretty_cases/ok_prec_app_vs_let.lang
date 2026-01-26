@@ -1,0 +1,1 @@
+(fun (x : Int) -> x) (let y = 1 in y)

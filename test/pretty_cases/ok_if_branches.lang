@@ -1,0 +1,5 @@
+if true then
+  export (fun (x : Int) -> x)
+else
+  letstack y = 1 in
+    y
